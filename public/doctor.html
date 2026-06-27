@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1e40af">
+  <title>Doctor Dashboard — EZYMED</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/doctor.css">
+</head>
+<body class="doctor-page">
+  <header class="site-header doctor-header">
+    <div class="container header-inner">
+      <a href="/doctor.html" class="logo">
+        <span class="logo-icon">+</span>
+        <span class="logo-text">EZYMED Doctor</span>
+      </a>
+      <nav class="nav-links" id="doctorNav" hidden>
+        <span class="doctor-name-label" id="doctorNameLabel"></span>
+        <button type="button" class="btn btn-ghost btn-logout" id="doctorLogoutBtn">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container doctor-main">
+    <!-- Login -->
+    <section id="doctorLogin" class="auth-page">
+      <div class="auth-card">
+        <h1>Doctor dashboard</h1>
+        <p class="subtitle">Appointments, patient summaries, consultations, and clinical actions</p>
+        <div id="doctorLoginAlert"></div>
+        <form id="doctorLoginForm">
+          <div class="form-group">
+            <label>Doctor</label>
+            <select name="doctorId" id="doctorIdSelect" required></select>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="Your password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        </form>
+        <p class="auth-footer"><a href="/">← Patient portal</a></p>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="doctorDashboard" hidden>
+      <div class="doctor-hero">
+        <div>
+          <h1 id="doctorWelcomeTitle">Doctor dashboard</h1>
+          <p class="text-muted" id="doctorDeptLabel"></p>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" id="refreshDashboardBtn">Refresh</button>
+      </div>
+
+      <div class="doctor-kpi-grid" id="doctorKpiGrid"></div>
+
+      <nav class="doctor-tabs" id="doctorTabs">
+        <button type="button" class="doctor-tab active" data-tab="overview">Overview</button>
+        <button type="button" class="doctor-tab" data-tab="appointments">Appointments</button>
+        <button type="button" class="doctor-tab" data-tab="consultations">Consultations</button>
+      </nav>
+
+      <div class="doctor-tab-panel active" id="tabOverview">
+        <div class="doctor-grid">
+          <div class="doctor-panel">
+            <div class="panel-header">
+              <h2>Today's schedule</h2>
+            </div>
+            <div id="todayAppointmentsList"></div>
+          </div>
+          <div class="doctor-panel">
+            <div class="panel-header">
+              <h2>Consultation queue</h2>
+              <button type="button" class="btn btn-outline btn-sm" id="refreshQueueBtn">Refresh</button>
+            </div>
+            <div id="overviewQueueList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="doctor-tab-panel" id="tabAppointments">
+        <div class="doctor-panel">
+          <div class="panel-header">
+            <h2>Your appointments</h2>
+            <div class="panel-actions">
+              <input type="date" id="appointmentDateFilter" class="input-sm">
+              <select id="appointmentStatusFilter" class="input-sm">
+                <option value="">All statuses</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no-show">No-show</option>
+              </select>
+            </div>
+          </div>
+          <div id="appointmentsList"></div>
+        </div>
+      </div>
+
+      <div class="doctor-tab-panel" id="tabConsultations">
+        <div class="doctor-panel">
+          <div class="panel-header">
+            <h2>Waiting &amp; active consultations</h2>
+            <button type="button" class="btn btn-outline btn-sm" id="refreshConsultationsBtn">Refresh</button>
+          </div>
+          <div id="consultationQueue"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Patient chart modal -->
+    <div id="patientChartModal" class="doctor-modal" hidden>
+      <div class="doctor-modal-backdrop" id="patientChartBackdrop"></div>
+      <div class="doctor-modal-content">
+        <div class="doctor-modal-header">
+          <div>
+            <h2 id="patientChartTitle">Patient chart</h2>
+            <p class="text-muted text-small" id="patientChartSubtitle"></p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="closePatientChartBtn">Close</button>
+        </div>
+        <div class="doctor-modal-body">
+          <div class="doctor-chart-grid">
+            <div class="doctor-panel ai-summary-panel">
+              <div class="panel-header">
+                <h3>AI patient summary</h3>
+                <button type="button" class="btn btn-outline btn-sm" id="refreshSummaryBtn">Regenerate</button>
+              </div>
+              <div id="aiSummaryContent"><p class="text-muted text-small">Loading summary…</p></div>
+            </div>
+            <div class="doctor-panel">
+              <div class="panel-header"><h3>Write note</h3></div>
+              <form id="patientNoteForm" class="clinical-form">
+                <input name="title" placeholder="Note title (optional)">
+                <textarea name="content" rows="4" placeholder="Clinical note…" required></textarea>
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Save note</button>
+              </form>
+            </div>
+          </div>
+          <div class="doctor-panel">
+            <div class="panel-header"><h3>Patient history</h3></div>
+            <div id="patientHistoryContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active consultation room -->
+    <section id="doctorRoom" class="telemedicine-room" hidden>
+      <div class="section-header">
+        <div>
+          <h2 id="doctorRoomTitle">Consultation</h2>
+          <span id="doctorRoomStatus"></span>
+        </div>
+        <div class="room-actions">
+          <button type="button" class="btn btn-outline btn-sm" id="viewPatientChartBtn">Patient chart</button>
+          <button type="button" class="btn btn-ghost text-danger" id="doctorEndBtn">End consultation</button>
+        </div>
+      </div>
+
+      <div class="telemedicine-layout">
+        <div class="telemedicine-main">
+          <div id="doctorVideoPanel" class="video-panel">
+            <video id="doctorRemoteVideo" autoplay playsinline></video>
+            <video id="doctorLocalVideo" autoplay playsinline muted></video>
+            <p class="text-small" id="doctorConnectionStatus">Connecting…</p>
+          </div>
+
+          <div class="card chat-panel">
+            <h3>Secure chat</h3>
+            <div id="doctorChatMessages" class="chat-messages"></div>
+            <form id="doctorChatForm" class="chat-form">
+              <input type="text" id="doctorChatInput" placeholder="Type a message…" autocomplete="off" required>
+              <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            </form>
+          </div>
+        </div>
+
+        <aside class="telemedicine-sidebar">
+          <div class="card">
+            <h3>Patient info</h3>
+            <div id="doctorPatientInfo"></div>
+          </div>
+
+          <div class="card">
+            <h3>Clinical note</h3>
+            <form id="consultNoteForm" class="clinical-form">
+              <input name="title" placeholder="Note title (optional)">
+              <textarea name="content" rows="3" placeholder="Visit notes…" required></textarea>
+              <button type="submit" class="btn btn-primary btn-sm btn-block">Save note</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Send prescription</h3>
+            <form id="prescriptionForm" class="clinical-form">
+              <input name="medication" placeholder="Medication name *" required>
+              <input name="dosage" placeholder="Dosage (e.g. 500mg)">
+              <input name="frequency" placeholder="Frequency (e.g. twice daily)">
+              <input name="duration" placeholder="Duration (e.g. 7 days)">
+              <textarea name="instructions" rows="2" placeholder="Instructions"></textarea>
+              <button type="submit" class="btn btn-primary btn-sm btn-block">Send prescription</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Request lab test</h3>
+            <form id="testForm" class="clinical-form">
+              <input name="testName" placeholder="Test name *" required>
+              <select name="urgency"><option value="routine">Routine</option><option value="urgent">Urgent</option></select>
+              <textarea name="instructions" rows="2" placeholder="Instructions"></textarea>
+              <button type="submit" class="btn btn-primary btn-sm btn-block">Request test</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Refer patient</h3>
+            <form id="referralForm" class="clinical-form">
+              <input name="specialty" placeholder="Specialty *" required>
+              <input name="facility" placeholder="Facility / hospital">
+              <textarea name="reason" rows="2" placeholder="Reason for referral"></textarea>
+              <button type="submit" class="btn btn-primary btn-sm btn-block">Issue referral</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Share file</h3>
+            <form id="fileForm" class="clinical-form" enctype="multipart/form-data">
+              <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt" required>
+              <input name="title" placeholder="File title">
+              <textarea name="description" rows="2" placeholder="Description"></textarea>
+              <button type="submit" class="btn btn-primary btn-sm btn-block">Share file</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Sent during visit</h3>
+            <div id="doctorClinicalRecords"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/webrtc-client.js"></script>
+  <script src="/js/doctor-portal.js"></script>
+</body>
+</html>

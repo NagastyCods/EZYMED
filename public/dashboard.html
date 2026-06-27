@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <title>Patient Portal — EZYMED</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="dashboard-page">
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/dashboard.html" class="logo">
+        <span class="logo-icon">+</span>
+        <span class="logo-text">EZYMED</span>
+      </a>
+      <nav class="nav-links">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar">
+          <span class="sidebar-toggle-bar"></span>
+          <span class="sidebar-toggle-bar"></span>
+          <span class="sidebar-toggle-bar"></span>
+        </button>
+        <button id="logoutBtn" class="btn btn-ghost btn-logout">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+
+  <div class="dashboard-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="user-info">
+        <div class="name" id="userName">Loading...</div>
+        <div class="email" id="userEmail"></div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="overview">Overview</button>
+        <button class="nav-item" data-section="symptom-checker">Symptom Checker</button>
+        <button class="nav-item" data-section="queue">Virtual Queue</button>
+        <button class="nav-item" data-section="profile">Profile</button>
+        <button class="nav-item" data-section="history">Medical History</button>
+        <button class="nav-item" data-section="allergies">Allergies</button>
+        <button class="nav-item" data-section="medications">Medications</button>
+        <button class="nav-item" data-section="insurance">Insurance</button>
+        <button class="nav-item" data-section="contacts">Emergency Contacts</button>
+        <button class="nav-item" data-section="appointments">Appointments</button>
+        <button class="nav-item" data-section="telemedicine">Telemedicine</button>
+      </nav>
+    </aside>
+
+    <main class="dashboard-main">
+      <!-- Overview -->
+      <section id="section-overview" class="section active">
+        <div class="welcome-banner">
+          <h2>Your health dashboard</h2>
+          <p>Manage your profile, medical records, and appointments — all from home.</p>
+        </div>
+        <div class="stats-grid" id="overviewStats"></div>
+        <div id="overviewReminders" class="appointment-reminders" hidden role="alert"></div>
+        <div class="card">
+          <h3>Quick actions</h3>
+          <div class="quick-actions">
+            <button class="btn btn-outline btn-sm" onclick="document.querySelector('[data-section=telemedicine]').click()">Start consultation</button>
+            <button class="btn btn-outline btn-sm" onclick="document.querySelector('[data-section=queue]').click()">Join queue</button>
+            <button class="btn btn-outline btn-sm" onclick="document.querySelector('[data-section=symptom-checker]').click()">Check symptoms</button>
+            <button class="btn btn-outline btn-sm" onclick="document.querySelector('[data-section=profile]').click()">Update profile</button>
+            <button class="btn btn-outline btn-sm" id="bookAppointmentBtnQuick" onclick="document.getElementById('bookAppointmentBtn').click()">Book appointment</button>
+            <button class="btn btn-outline btn-sm" onclick="document.querySelector('[data-section=allergies]').click()">Add allergy</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI Symptom Checker -->
+      <section id="section-symptom-checker" class="section">
+        <div class="section-header">
+          <h2>AI Symptom Checker</h2>
+        </div>
+
+        <div class="disclaimer-banner" role="alert">
+          <strong>Important:</strong> This tool does <em>not</em> diagnose disease. It supports triage only and helps direct you to appropriate care. Always consult a qualified healthcare professional. In an emergency, call emergency services immediately.
+        </div>
+
+        <div id="symptomCheckerApp">
+          <!-- Intro -->
+          <div id="scIntro" class="card">
+            <h3>Check your symptoms before your visit</h3>
+            <p class="text-muted">Answer a few questions about how you feel. OpenAI analyzes your responses to suggest possible conditions to discuss with a doctor, estimate urgency, recommend a department, and advise whether to stay home, book a consultation, or seek emergency care.</p>
+            <button type="button" class="btn btn-primary" id="startSymptomCheckBtn">Start symptom check</button>
+          </div>
+
+          <!-- Wizard -->
+          <div id="scWizard" class="card" hidden>
+            <div class="wizard-progress">
+              <div class="wizard-progress-bar" id="scProgressBar"></div>
+            </div>
+            <p class="wizard-step-label" id="scStepLabel">Step 1 of 5</p>
+            <h3 id="scStepTitle"></h3>
+            <p class="text-muted" id="scStepHelp"></p>
+            <div id="scStepContent"></div>
+            <div id="scWizardAlert"></div>
+            <div class="wizard-actions">
+              <button type="button" class="btn btn-ghost" id="scPrevBtn" disabled>Back</button>
+              <button type="button" class="btn btn-primary" id="scNextBtn">Continue</button>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div id="scResults" hidden></div>
+
+          <!-- History -->
+          <div class="card card-spaced">
+            <div class="section-header section-header-compact">
+              <h3>Previous assessments</h3>
+            </div>
+            <div id="scHistoryList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Profile -->
+      <section id="section-profile" class="section">
+        <div class="section-header">
+          <h2>Patient Profile</h2>
+        </div>
+        <div id="profileAlert"></div>
+        <div class="card">
+          <form id="profileForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label>First name</label>
+                <input name="firstName" required>
+              </div>
+              <div class="form-group">
+                <label>Last name</label>
+                <input name="lastName" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email</label>
+                <input name="email" type="email" disabled>
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input name="phone" type="tel">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Date of birth</label>
+                <input name="dateOfBirth" type="date">
+              </div>
+              <div class="form-group">
+                <label>Gender</label>
+                <select name="gender">
+                  <option value="">Select</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer-not-to-say">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Blood type</label>
+              <select name="bloodType">
+                <option value="unknown">Unknown</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+            <h3 class="form-section-title">Address</h3>
+            <div class="form-group">
+              <label>Street</label>
+              <input name="street">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>City</label>
+                <input name="city">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input name="state">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Zip code</label>
+                <input name="zipCode">
+              </div>
+              <div class="form-group">
+                <label>Country</label>
+                <input name="country" value="Nigeria">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save profile</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Medical History -->
+      <section id="section-history" class="section">
+        <div class="section-header">
+          <h2>Medical History</h2>
+          <button class="btn btn-primary btn-sm" id="addHistoryBtn">Add record</button>
+        </div>
+        <div id="historyList"></div>
+      </section>
+
+      <!-- Allergies -->
+      <section id="section-allergies" class="section">
+        <div class="section-header">
+          <h2>Allergies</h2>
+          <button class="btn btn-primary btn-sm" id="addAllergyBtn">Add allergy</button>
+        </div>
+        <div id="allergiesList"></div>
+      </section>
+
+      <!-- Medications -->
+      <section id="section-medications" class="section">
+        <div class="section-header">
+          <h2>Current Medications</h2>
+          <button class="btn btn-primary btn-sm" id="addMedicationBtn">Add medication</button>
+        </div>
+        <div id="medicationsList"></div>
+      </section>
+
+      <!-- Insurance -->
+      <section id="section-insurance" class="section">
+        <div class="section-header">
+          <h2>Insurance Information</h2>
+        </div>
+        <div id="insuranceAlert"></div>
+        <div class="card">
+          <form id="insuranceForm">
+            <div class="form-group">
+              <label>Insurance provider</label>
+              <input name="provider" placeholder="e.g. NHIS, HMO name">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Policy number</label>
+                <input name="policyNumber">
+              </div>
+              <div class="form-group">
+                <label>Group number</label>
+                <input name="groupNumber">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Plan type</label>
+                <input name="planType" placeholder="e.g. Family, Individual">
+              </div>
+              <div class="form-group">
+                <label>Expiry date</label>
+                <input name="expiryDate" type="date">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save insurance</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Emergency Contacts -->
+      <section id="section-contacts" class="section">
+        <div class="section-header">
+          <h2>Emergency Contacts</h2>
+          <button class="btn btn-primary btn-sm" id="addContactBtn">Add contact</button>
+        </div>
+        <div id="contactsList"></div>
+      </section>
+
+      <!-- Virtual Queue -->
+      <section id="section-queue" class="section">
+        <div class="section-header">
+          <h2>Virtual Queue</h2>
+        </div>
+
+        <div class="card queue-intro">
+          <h3>Wait from home, not the hospital</h3>
+          <p class="text-muted">Join a live virtual queue and track your position in real time. Get notified when it's almost your turn — no unnecessary time in waiting rooms.</p>
+        </div>
+
+        <div id="queueNotification" class="queue-notification" hidden role="alert"></div>
+
+        <div id="queueJoinPanel" class="card">
+          <h3>Join the queue</h3>
+          <div id="queueJoinAlert"></div>
+          <form id="queueJoinForm">
+            <div class="form-group">
+              <label>Department</label>
+              <select name="department" id="queueDepartment" required></select>
+            </div>
+            <div class="form-group">
+              <label>Reason for visit</label>
+              <textarea name="reason" rows="2" placeholder="Brief description of why you need to see a doctor"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Priority</label>
+              <select name="urgency">
+                <option value="routine">Routine</option>
+                <option value="moderate">Moderate</option>
+                <option value="urgent">Urgent</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Join virtual queue</button>
+          </form>
+        </div>
+
+        <div id="queueStatusPanel" class="card queue-status-card" hidden>
+          <div class="queue-status-header">
+            <div>
+              <p class="queue-status-label">Your queue number</p>
+              <p class="queue-number" id="queueNumber">—</p>
+            </div>
+            <span id="queueStatusBadge"></span>
+          </div>
+
+          <div class="queue-stats-grid">
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="queuePosition">—</span>
+              <span class="queue-stat-label">Position in queue</span>
+            </div>
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="queueWaitTime">—</span>
+              <span class="queue-stat-label">Est. wait time</span>
+            </div>
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="queueAhead">—</span>
+              <span class="queue-stat-label">Patients ahead</span>
+            </div>
+          </div>
+
+          <div class="queue-doctor-card" id="queueDoctorCard">
+            <span class="queue-doctor-icon">👨‍⚕️</span>
+            <div>
+              <p class="queue-stat-label">Doctor assigned</p>
+              <p class="queue-doctor-name" id="queueDoctor">Assigning…</p>
+            </div>
+          </div>
+
+          <p class="text-muted text-small" id="queueDepartmentLabel"></p>
+          <p class="text-small queue-live-indicator"><span class="live-dot"></span> Live updates every 10 seconds</p>
+
+          <div class="queue-actions">
+            <button type="button" class="btn btn-outline" id="queueRefreshBtn">Refresh now</button>
+            <button type="button" class="btn btn-ghost text-danger" id="queueLeaveBtn">Leave queue</button>
+          </div>
+        </div>
+
+        <div class="card card-spaced">
+          <h3>Queue history</h3>
+          <div id="queueHistoryList"></div>
+        </div>
+      </section>
+
+      <!-- Appointments -->
+      <section id="section-appointments" class="section">
+        <div class="section-header">
+          <h2>Appointments</h2>
+          <button class="btn btn-primary btn-sm" id="bookAppointmentBtn">Book appointment</button>
+        </div>
+
+        <div id="appointmentReminders" class="appointment-reminders" hidden role="alert"></div>
+
+        <div id="bookingWizard" class="card booking-wizard" hidden>
+          <div class="section-header section-header-compact">
+            <h3 id="bookingWizardTitle">Book an appointment</h3>
+            <button type="button" class="btn btn-ghost btn-sm" id="bookingCancelWizard">Close</button>
+          </div>
+          <div id="bookingAlert"></div>
+          <form id="bookingForm">
+            <div class="form-group">
+              <label>Department</label>
+              <select id="bookingDepartment" required></select>
+            </div>
+            <div class="form-group">
+              <label>Select a doctor</label>
+              <div id="doctorList" class="doctor-list"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Date</label>
+                <select id="bookingDate" required></select>
+              </div>
+              <div class="form-group">
+                <label>Consultation type</label>
+                <select id="bookingType">
+                  <option value="virtual">Virtual consultation</option>
+                  <option value="in-person">In-person</option>
+                  <option value="follow-up">Follow-up</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Available time slots</label>
+              <div id="slotGrid" class="slot-grid"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Priority</label>
+                <select id="bookingUrgency">
+                  <option value="routine">Routine</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Reason for visit</label>
+              <textarea id="bookingReason" rows="2" placeholder="Brief description"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="bookingSubmitBtn">Confirm booking</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Upcoming appointments</h3>
+          <div id="upcomingAppointments"></div>
+        </div>
+
+        <div class="card card-spaced">
+          <h3>Past appointments</h3>
+          <div id="pastAppointments"></div>
+        </div>
+      </section>
+
+      <!-- Telemedicine -->
+      <section id="section-telemedicine" class="section">
+        <div class="section-header">
+          <h2>Telemedicine</h2>
+        </div>
+
+        <div class="card queue-intro">
+          <h3>Secure consultations from home</h3>
+          <p class="text-muted">Connect with your doctor via encrypted video, voice, or text chat. Doctors can share files, send prescriptions, recommend tests, and issue referrals during your visit.</p>
+          <p class="text-small"><a href="/doctor.html" target="_blank" rel="noopener">Doctor portal →</a> (for clinicians)</p>
+        </div>
+
+        <div id="tmLobby" class="card">
+          <h3>Start a consultation</h3>
+          <div id="tmRequestAlert"></div>
+          <form id="tmRequestForm">
+            <div class="form-group">
+              <label>Consultation type</label>
+              <select name="mode" required>
+                <option value="video">Video consultation</option>
+                <option value="voice">Voice consultation</option>
+                <option value="chat">Text chat only</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Department</label>
+              <select name="department" id="tmDepartment">
+                <option value="General Medicine">General Medicine</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="Cardiology">Cardiology</option>
+                <option value="Dermatology">Dermatology</option>
+                <option value="Psychiatry / Mental Health">Psychiatry / Mental Health</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Reason for consultation</label>
+              <textarea name="reason" rows="2" placeholder="Describe your symptoms or concern"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Request consultation</button>
+          </form>
+        </div>
+
+        <div id="tmRoom" class="telemedicine-room" hidden>
+          <div class="section-header section-header-compact">
+            <div>
+              <h3 id="tmRoomTitle">Consultation</h3>
+              <span id="tmRoomStatus"></span>
+            </div>
+            <button type="button" class="btn btn-ghost text-danger btn-sm" id="tmEndBtn">End consultation</button>
+          </div>
+
+          <div class="telemedicine-layout patient-layout">
+            <div class="telemedicine-main">
+              <div id="tmVideoPanel" class="video-panel">
+                <video id="tmRemoteVideo" autoplay playsinline></video>
+                <video id="tmLocalVideo" autoplay playsinline muted></video>
+                <p class="text-small" id="tmConnectionStatus">Waiting for doctor…</p>
+              </div>
+
+              <div class="card chat-panel">
+                <h3>Secure chat</h3>
+                <div id="tmChatMessages" class="chat-messages"></div>
+                <form id="tmChatForm" class="chat-form">
+                  <input type="text" id="tmChatInput" placeholder="Type a message…" autocomplete="off" required>
+                  <button type="submit" class="btn btn-primary btn-sm">Send</button>
+                </form>
+              </div>
+            </div>
+
+            <aside class="telemedicine-sidebar">
+              <div class="card">
+                <h3>From your doctor</h3>
+                <div id="tmClinicalRecords"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <div class="card card-spaced">
+          <h3>Clinical records history</h3>
+          <div id="tmRecordsHistory"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Form</h3>
+        <button class="modal-close" id="modalClose" type="button">&times;</button>
+      </div>
+      <div id="modalAlert"></div>
+      <form id="modalForm">
+        <div id="modalFields"></div>
+        <button type="submit" class="btn btn-primary btn-block btn-spaced-top">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/webrtc-client.js"></script>
+  <script src="/js/symptom-checker.js"></script>
+  <script src="/js/queue.js"></script>
+  <script src="/js/appointments.js"></script>
+  <script src="/js/telemedicine.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

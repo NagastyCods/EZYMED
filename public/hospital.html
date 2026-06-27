@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Hospital Dashboard — EZYMED</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/hospital.css">
+</head>
+<body class="hospital-page">
+  <header class="hospital-header">
+    <div class="container header-inner">
+      <a href="/hospital.html" class="logo">
+        <span class="logo-icon">+</span>
+        <span class="logo-text">EZYMED Hospital</span>
+      </a>
+      <nav class="nav-links" id="hospitalNav" hidden>
+        <span class="live-indicator-header"><span class="live-dot"></span> Live</span>
+        <span id="lastUpdated" class="text-small"></span>
+        <button type="button" class="btn btn-ghost btn-logout" id="hospitalLogoutBtn">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container hospital-main">
+    <section id="hospitalLogin" class="auth-page">
+      <div class="auth-card">
+        <h1>Hospital dashboard</h1>
+        <p class="subtitle">Administrator access — monitor queues, consultations, and operations</p>
+        <div id="hospitalLoginAlert"></div>
+        <form id="hospitalLoginForm">
+          <div class="form-group">
+            <label>Administrator email</label>
+            <input type="email" name="email" value="admin@ezymed.com" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="Admin password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        </form>
+        <p class="auth-footer"><a href="/">← Patient portal</a></p>
+      </div>
+    </section>
+
+    <section id="hospitalDashboard" hidden>
+      <div class="hospital-hero">
+        <div>
+          <h1>Operations overview</h1>
+          <p class="text-muted">Real-time hospital monitoring and analytics</p>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" id="refreshDashboardBtn">Refresh now</button>
+      </div>
+
+      <div class="hospital-kpi-grid" id="kpiGrid"></div>
+
+      <div class="hospital-grid">
+        <div class="hospital-panel hospital-panel-wide">
+          <div class="panel-header">
+            <h2>Live patient queue</h2>
+            <span class="badge badge-info" id="queueCountBadge">0</span>
+          </div>
+          <div id="liveQueueTable" class="data-table-wrap"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Active consultations</h2></div>
+          <div id="activeConsultationsList"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Waiting times by department</h2></div>
+          <div id="waitingTimesChart"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Doctor availability</h2></div>
+          <div id="doctorAvailabilityList"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Bed occupancy</h2></div>
+          <div id="bedOccupancyPanel"></div>
+        </div>
+
+        <div class="hospital-panel hospital-panel-wide">
+          <div class="panel-header"><h2>Today's appointments</h2></div>
+          <div id="dailyAppointmentsSummary" class="mini-stats"></div>
+          <div id="dailyAppointmentsList" class="data-table-wrap"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Queue analytics (today)</h2></div>
+          <div id="queueAnalyticsPanel"></div>
+        </div>
+
+        <div class="hospital-panel">
+          <div class="panel-header"><h2>Patient satisfaction</h2></div>
+          <div id="satisfactionPanel"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/hospital-dashboard.js"></script>
+</body>
+</html>
