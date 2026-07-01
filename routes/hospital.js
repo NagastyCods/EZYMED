@@ -22,7 +22,17 @@ router.post('/auth/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const { admin, token } = await authenticateAdmin(email, password);
+    const result = await authenticateAdmin(email, password, req);
+    if (result.requiresMfa) {
+      return res.json({
+        message: 'MFA verification required',
+        requiresMfa: true,
+        mfaToken: result.mfaToken,
+        admin: result.admin,
+      });
+    }
+
+    const { admin, token } = result;
     res.json({ message: 'Login successful', token, admin });
   } catch (err) {
     res.status(401).json({ message: err.message });

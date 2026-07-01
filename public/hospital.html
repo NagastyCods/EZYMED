@@ -40,6 +40,13 @@
           </div>
           <button type="submit" class="btn btn-primary btn-block">Sign in</button>
         </form>
+        <form id="hospitalMfaForm" hidden>
+          <div class="form-group">
+            <label>Authenticator code</label>
+            <input type="text" name="code" inputmode="numeric" maxlength="6" required placeholder="6-digit code">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Verify &amp; sign in</button>
+        </form>
         <p class="auth-footer"><a href="/">← Patient portal</a></p>
       </div>
     </section>
@@ -98,6 +105,14 @@
         <div class="hospital-panel">
           <div class="panel-header"><h2>Patient satisfaction</h2></div>
           <div id="satisfactionPanel"></div>
+        </div>
+
+        <div class="hospital-panel hospital-panel-wide">
+          <div class="panel-header">
+            <h2>Security audit log</h2>
+            <button type="button" class="btn btn-outline btn-sm" id="loadAuditLogsBtn">Refresh logs</button>
+          </div>
+          <div id="auditLogsPanel"><p class="text-muted text-small">Access and security events (RBAC-protected).</p></div>
         </div>
       </div>
     </section>

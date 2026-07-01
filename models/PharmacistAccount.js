@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const hospitalAdminSchema = new mongoose.Schema({
-  email: {
+const pharmacistAccountSchema = new mongoose.Schema({
+  pharmacyId: {
     type: String,
     required: true,
     unique: true,
-    lowercase: true,
     trim: true,
+    lowercase: true,
   },
   password: {
     type: String,
@@ -15,20 +15,19 @@ const hospitalAdminSchema = new mongoose.Schema({
     minlength: 8,
     select: false,
   },
-  name: { type: String, trim: true, default: 'Hospital Administrator' },
   active: { type: Boolean, default: true },
   lastLoginAt: { type: Date },
   mfaEnabled: { type: Boolean, default: false },
   mfaSecret: { type: String, select: false },
 }, { timestamps: true });
 
-hospitalAdminSchema.pre('save', async function () {
+pharmacistAccountSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, 12);
 });
 
-hospitalAdminSchema.methods.comparePassword = async function (candidate) {
+pharmacistAccountSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
-module.exports = mongoose.model('HospitalAdmin', hospitalAdminSchema);
+module.exports = mongoose.model('PharmacistAccount', pharmacistAccountSchema);

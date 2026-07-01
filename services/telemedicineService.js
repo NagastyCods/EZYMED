@@ -2,6 +2,10 @@ const Consultation = require('../models/Consultation');
 const ConsultationMessage = require('../models/ConsultationMessage');
 const ClinicalRecord = require('../models/ClinicalRecord');
 const { findDoctorById, DOCTORS } = require('../config/doctors');
+const { receivePrescription } = require('./pharmacyService');
+const { encrypt, decrypt } = require('./encryptionService');
+const { requireActiveConsent } = require('./consentService');
+const { logAudit } = require('./auditService');
 
 async function getActiveConsultation(patientId) {
   return Consultation.findOne({
@@ -10,7 +14,15 @@ async function getActiveConsultation(patientId) {
   }).sort({ createdAt: -1 });
 }
 
-async function requestConsultation(patientId, { mode, doctorId, department, reason, appointmentId }) {
+function decryptMessage(message) {
+  const obj = message.toObject ? message.toObject() : { ...message };
+  obj.content = decrypt(obj.content);
+  return obj;
+}
+
+async function requestConsultation(patientId, { mode, doctorId, department, reason, appointmentId }, req) {
+  await requireActiveConsent(patientId, 'telemedicine');
+
   const existing = await getActiveConsultation(patientId);
   if (existing) {
     throw new Error('You already have an active consultation. Please end it before starting a new one.');
@@ -40,7 +52,18 @@ async function requestConsultation(patientId, { mode, doctorId, department, reas
     consultation: consultation._id,
     senderType: 'patient',
     senderName: 'System',
-    content: `Consultation requested (${mode}). Waiting for ${doctor?.name || 'a doctor'} to join.`,
+    content: encrypt(`Consultation requested (${mode}). Waiting for ${doctor?.name || 'a doctor'} to join.`),
+  });
+
+  await logAudit({
+    actorRole: 'patient',
+    actorId: patientId.toString(),
+    action: 'consultation.request',
+    resourceType: 'consultation',
+    resourceId: consultation._id.toString(),
+    patientId,
+    req,
+    metadata: { mode },
   });
 
   return consultation;
@@ -55,7 +78,7 @@ async function getConsultationForPatient(patientId, consultationId) {
   return consultation;
 }
 
-async function endConsultation(patientId, consultationId) {
+async function endConsultation(patientId, consultationId, req) {
   const consultation = await getConsultationForPatient(patientId, consultationId);
   if (consultation.status === 'ended') return consultation;
 
@@ -67,14 +90,25 @@ async function endConsultation(patientId, consultationId) {
     consultation: consultation._id,
     senderType: 'patient',
     senderName: 'System',
-    content: 'Consultation ended.',
+    content: encrypt('Consultation ended.'),
+  });
+
+  await logAudit({
+    actorRole: 'patient',
+    actorId: patientId.toString(),
+    action: 'consultation.end',
+    resourceType: 'consultation',
+    resourceId: consultation._id.toString(),
+    patientId,
+    req,
   });
 
   return consultation;
 }
 
 async function getMessages(consultationId) {
-  return ConsultationMessage.find({ consultation: consultationId }).sort({ createdAt: 1 });
+  const messages = await ConsultationMessage.find({ consultation: consultationId }).sort({ createdAt: 1 });
+  return messages.map(decryptMessage);
 }
 
 async function getClinicalRecords(consultationId) {
@@ -85,13 +119,15 @@ async function getPatientRecords(patientId) {
   return ClinicalRecord.find({ patient: patientId }).sort({ createdAt: -1 }).limit(50);
 }
 
-async function doctorJoinConsultation(doctorId, consultationId) {
+async function doctorJoinConsultation(doctorId, consultationId, req) {
   const doctor = findDoctorById(doctorId);
   if (!doctor) throw new Error('Doctor not found.');
 
   const consultation = await Consultation.findById(consultationId);
   if (!consultation) throw new Error('Consultation not found.');
   if (consultation.status === 'ended') throw new Error('Consultation has already ended.');
+
+  await requireActiveConsent(consultation.patient, 'telemedicine');
 
   consultation.doctorId = doctor.id;
   consultation.doctorName = doctor.name;
@@ -104,7 +140,18 @@ async function doctorJoinConsultation(doctorId, consultationId) {
     consultation: consultation._id,
     senderType: 'doctor',
     senderName: doctor.name,
-    content: `${doctor.name} joined the consultation.`,
+    content: encrypt(`${doctor.name} joined the consultation.`),
+  });
+
+  await logAudit({
+    actorRole: 'doctor',
+    actorId: doctor.id,
+    actorName: doctor.name,
+    action: 'consultation.join',
+    resourceType: 'consultation',
+    resourceId: consultation._id.toString(),
+    patientId: consultation.patient,
+    req,
   });
 
   return consultation;
@@ -130,7 +177,7 @@ async function getWaitingConsultations(doctorId) {
     .sort({ createdAt: 1 });
 }
 
-async function addClinicalRecord(doctorId, consultationId, payload) {
+async function addClinicalRecord(doctorId, consultationId, payload, req) {
   const doctor = findDoctorById(doctorId);
   if (!doctor) throw new Error('Doctor not found.');
 
@@ -156,8 +203,24 @@ async function addClinicalRecord(doctorId, consultationId, payload) {
     consultation: consultation._id,
     senderType: 'doctor',
     senderName: doctor.name,
-    content: `${typeLabels[payload.type] || 'Record added'}: ${payload.title}`,
+    content: encrypt(`${typeLabels[payload.type] || 'Record added'}: ${payload.title}`),
   });
+
+  await logAudit({
+    actorRole: 'doctor',
+    actorId: doctor.id,
+    actorName: doctor.name,
+    action: `clinical.${payload.type}`,
+    resourceType: 'clinical_record',
+    resourceId: record._id.toString(),
+    patientId: consultation.patient,
+    req,
+    metadata: { title: payload.title },
+  });
+
+  if (payload.type === 'prescription') {
+    await receivePrescription(record);
+  }
 
   return record;
 }
@@ -167,7 +230,7 @@ async function saveChatMessage(consultationId, senderType, senderName, content) 
     consultation: consultationId,
     senderType,
     senderName,
-    content,
+    content: encrypt(content),
   });
 }
 

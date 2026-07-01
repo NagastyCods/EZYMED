@@ -5,20 +5,17 @@ const SymptomAssessment = require('../models/SymptomAssessment');
 const ClinicalRecord = require('../models/ClinicalRecord');
 const DoctorNote = require('../models/DoctorNote');
 const { findDoctorById } = require('../config/doctors');
+const { requireActiveConsent } = require('./consentService');
+const { logAudit } = require('./auditService');
+const { encrypt, decrypt } = require('./encryptionService');
 
-function startOfDay(date = new Date()) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+function decryptNote(note) {
+  const obj = note.toObject ? note.toObject() : { ...note };
+  obj.content = decrypt(obj.content);
+  return obj;
 }
 
-function endOfDay(date = new Date()) {
-  const d = startOfDay(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-async function assertDoctorPatientAccess(doctorId, patientId) {
+async function assertDoctorPatientAccess(doctorId, patientId, req) {
   const doctor = findDoctorById(doctorId);
   if (!doctor) throw new Error('Doctor not found');
 
@@ -37,11 +34,47 @@ async function assertDoctorPatientAccess(doctorId, patientId) {
       department: doctor.department,
     });
     if (!deptAppointment && !deptConsultation) {
+      await logAudit({
+        actorRole: 'doctor',
+        actorId: doctor.id,
+        actorName: doctor.name,
+        action: 'patient_records.access_denied',
+        outcome: 'denied',
+        resourceType: 'patient',
+        resourceId: patientId.toString(),
+        patientId,
+        req,
+      });
       throw new Error('You do not have access to this patient record');
     }
   }
 
+  await requireActiveConsent(patientId, 'data_sharing');
+
+  await logAudit({
+    actorRole: 'doctor',
+    actorId: doctor.id,
+    actorName: doctor.name,
+    action: 'patient_records.access',
+    resourceType: 'patient',
+    resourceId: patientId.toString(),
+    patientId,
+    req,
+  });
+
   return doctor;
+}
+
+function startOfDay(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date = new Date()) {
+  const d = startOfDay(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
 }
 
 async function getDoctorDashboardOverview(doctorId) {
@@ -119,8 +152,8 @@ async function getDoctorAppointments(doctorId, { date, status } = {}) {
   return appointments;
 }
 
-async function getPatientHistory(doctorId, patientId) {
-  await assertDoctorPatientAccess(doctorId, patientId);
+async function getPatientHistory(doctorId, patientId, req) {
+  await assertDoctorPatientAccess(doctorId, patientId, req);
 
   const patient = await Patient.findById(patientId).select('-password');
   if (!patient) throw new Error('Patient not found');
@@ -138,13 +171,13 @@ async function getPatientHistory(doctorId, patientId) {
     appointments,
     assessments,
     records,
-    notes,
+    notes: notes.map(decryptNote),
     consultations,
   };
 }
 
-async function addDoctorNote(doctorId, patientId, { content, title, consultationId }) {
-  const doctor = await assertDoctorPatientAccess(doctorId, patientId);
+async function addDoctorNote(doctorId, patientId, { content, title, consultationId }, req) {
+  const doctor = await assertDoctorPatientAccess(doctorId, patientId, req);
   if (!content?.trim()) throw new Error('Note content is required');
 
   if (consultationId) {
@@ -152,14 +185,27 @@ async function addDoctorNote(doctorId, patientId, { content, title, consultation
     if (!consultation) throw new Error('Consultation not found');
   }
 
-  return DoctorNote.create({
+  const note = await DoctorNote.create({
     patient: patientId,
     doctorId: doctor.id,
     doctorName: doctor.name,
     consultation: consultationId || null,
     title: title?.trim() || 'Clinical note',
-    content: content.trim(),
+    content: encrypt(content.trim()),
   });
+
+  await logAudit({
+    actorRole: 'doctor',
+    actorId: doctor.id,
+    actorName: doctor.name,
+    action: 'clinical.note',
+    resourceType: 'doctor_note',
+    resourceId: note._id.toString(),
+    patientId,
+    req,
+  });
+
+  return decryptNote(note);
 }
 
 async function completeAppointment(doctorId, appointmentId) {

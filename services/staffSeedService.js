@@ -1,9 +1,12 @@
 const { DOCTORS } = require('../config/doctors');
+const { PHARMACIES } = require('../config/pharmacies');
 const DoctorAccount = require('../models/DoctorAccount');
 const HospitalAdmin = require('../models/HospitalAdmin');
+const PharmacistAccount = require('../models/PharmacistAccount');
 
 async function seedStaffAccounts() {
   const defaultDoctorPassword = process.env.DOCTOR_DEFAULT_PASSWORD || 'Doctor@123';
+  const defaultPharmacyPassword = process.env.PHARMACY_DEFAULT_PASSWORD || 'Pharmacy@123';
   const adminEmail = (process.env.HOSPITAL_ADMIN_EMAIL || 'admin@ezymed.com').toLowerCase();
   const adminPassword = process.env.HOSPITAL_ADMIN_PASSWORD || 'Admin@123';
 
@@ -16,6 +19,17 @@ async function seedStaffAccounts() {
     await DoctorAccount.create({
       doctorId: doctor.id,
       password: defaultDoctorPassword,
+    });
+    seeded += 1;
+  }
+
+  for (const pharmacy of PHARMACIES) {
+    const exists = await PharmacistAccount.findOne({ pharmacyId: pharmacy.id });
+    if (exists) continue;
+
+    await PharmacistAccount.create({
+      pharmacyId: pharmacy.id,
+      password: defaultPharmacyPassword,
     });
     seeded += 1;
   }

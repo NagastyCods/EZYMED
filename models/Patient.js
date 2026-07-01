@@ -69,6 +69,8 @@ const patientSchema = new mongoose.Schema({
   allergies: [allergySchema],
   medications: [medicationSchema],
   medicalHistory: [medicalHistorySchema],
+  mfaEnabled: { type: Boolean, default: false },
+  mfaSecret: { type: String, select: false },
 }, { timestamps: true });
 
 patientSchema.virtual('fullName').get(function () {

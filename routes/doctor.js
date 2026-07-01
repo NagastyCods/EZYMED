@@ -60,7 +60,17 @@ router.post('/auth/login', async (req, res) => {
       return res.status(400).json({ message: 'Doctor ID and password are required' });
     }
 
-    const { doctor, token } = await authenticateDoctor(doctorId, password);
+    const result = await authenticateDoctor(doctorId, password, req);
+    if (result.requiresMfa) {
+      return res.json({
+        message: 'MFA verification required',
+        requiresMfa: true,
+        mfaToken: result.mfaToken,
+        doctor: result.doctor,
+      });
+    }
+
+    const { doctor, token } = result;
     res.json({
       message: 'Login successful',
       token,
@@ -105,20 +115,22 @@ router.patch('/appointments/:id/complete', async (req, res) => {
 
 router.get('/patients/:patientId/history', async (req, res) => {
   try {
-    const history = await getPatientHistory(req.doctorId, req.params.patientId);
+    const history = await getPatientHistory(req.doctorId, req.params.patientId, req);
     res.json(history);
   } catch (err) {
-    res.status(err.message.includes('access') ? 403 : 404).json({ message: err.message });
+    const status = err.code === 'CONSENT_REQUIRED' || err.message.includes('consent') ? 403 : 404;
+    res.status(status).json({ message: err.message, code: err.code });
   }
 });
 
 router.get('/patients/:patientId/summary', async (req, res) => {
   try {
-    await getPatientHistory(req.doctorId, req.params.patientId);
+    await getPatientHistory(req.doctorId, req.params.patientId, req);
     const summary = await generatePatientSummary(req.params.patientId);
     res.json({ summary });
   } catch (err) {
-    res.status(err.message.includes('access') ? 403 : 404).json({ message: err.message });
+    const status = err.code === 'CONSENT_REQUIRED' || err.message.includes('consent') || err.message.includes('access') ? 403 : 404;
+    res.status(status).json({ message: err.message, code: err.code });
   }
 });
 
@@ -129,7 +141,7 @@ router.post('/patients/:patientId/notes', async (req, res) => {
       content,
       title,
       consultationId,
-    });
+    }, req);
     res.status(201).json({ message: 'Note saved', note });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -147,7 +159,7 @@ router.get('/consultations', async (req, res) => {
 
 router.patch('/consultations/:id/join', async (req, res) => {
   try {
-    const consultation = await doctorJoinConsultation(req.doctorId, req.params.id);
+    const consultation = await doctorJoinConsultation(req.doctorId, req.params.id, req);
     const populated = await Consultation.findById(consultation._id)
       .populate('patient', 'firstName lastName email');
     const [messages, records] = await Promise.all([
@@ -190,7 +202,7 @@ router.post('/consultations/:id/prescription', async (req, res) => {
       type: 'prescription',
       title: medication,
       details: { dosage, frequency, duration, instructions },
-    });
+    }, req);
     res.status(201).json({ message: 'Prescription sent', record });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -206,7 +218,7 @@ router.post('/consultations/:id/test', async (req, res) => {
       type: 'test',
       title: testName,
       details: { urgency: urgency || 'routine', instructions },
-    });
+    }, req);
     res.status(201).json({ message: 'Test recommended', record });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -222,7 +234,7 @@ router.post('/consultations/:id/referral', async (req, res) => {
       type: 'referral',
       title: `Referral to ${specialty}`,
       details: { specialty, facility, reason, urgency: urgency || 'routine' },
-    });
+    }, req);
     res.status(201).json({ message: 'Referral issued', record });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -238,7 +250,7 @@ router.post('/consultations/:id/note', async (req, res) => {
       content: req.body.content,
       title: req.body.title,
       consultationId: consultation._id,
-    });
+    }, req);
     res.status(201).json({ message: 'Note saved', note });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -256,7 +268,7 @@ router.post('/consultations/:id/file', upload.single('file'), async (req, res) =
       fileName: req.file.originalname,
       filePath: req.file.filename,
       fileMimeType: req.file.mimetype,
-    });
+    }, req);
     res.status(201).json({ message: 'File shared', record });
   } catch (err) {
     res.status(400).json({ message: err.message });

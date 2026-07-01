@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#7c3aed">
+  <title>Pharmacy Portal — EZYMED</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/pharmacy.css">
+</head>
+<body class="pharmacy-page">
+  <header class="site-header pharmacy-header">
+    <div class="container header-inner">
+      <a href="/pharmacy.html" class="logo">
+        <span class="logo-icon">+</span>
+        <span class="logo-text">EZYMED Pharmacy</span>
+      </a>
+      <nav class="nav-links" id="pharmacyNav" hidden>
+        <span class="pharmacy-name-label" id="pharmacyNameLabel"></span>
+        <button type="button" class="btn btn-ghost btn-logout" id="pharmacyLogoutBtn">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container pharmacy-main">
+    <section id="pharmacyLogin" class="auth-page">
+      <div class="auth-card">
+        <h1>Pharmacy portal</h1>
+        <p class="subtitle">Receive e-prescriptions, verify medications, and coordinate fulfillment</p>
+        <div id="pharmacyLoginAlert"></div>
+        <form id="pharmacyLoginForm">
+          <div class="form-group">
+            <label>Pharmacy location</label>
+            <select name="pharmacyId" id="pharmacyIdSelect" required></select>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="Pharmacy password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        </form>
+        <p class="auth-footer"><a href="/">← Patient portal</a></p>
+      </div>
+    </section>
+
+    <section id="pharmacyDashboard" hidden>
+      <div class="pharmacy-hero">
+        <div>
+          <h1 id="pharmacyWelcomeTitle">Pharmacy dashboard</h1>
+          <p class="text-muted" id="pharmacyAddressLabel"></p>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" id="refreshPharmacyBtn">Refresh</button>
+      </div>
+
+      <div class="pharmacy-kpi-grid" id="pharmacyKpiGrid"></div>
+
+      <nav class="pharmacy-tabs">
+        <button type="button" class="pharmacy-tab active" data-tab="inbox">New e-prescriptions</button>
+        <button type="button" class="pharmacy-tab" data-tab="active">In progress</button>
+        <button type="button" class="pharmacy-tab" data-tab="delivery">Delivery</button>
+        <button type="button" class="pharmacy-tab" data-tab="completed">Completed</button>
+      </nav>
+
+      <div class="pharmacy-panel">
+        <div id="pharmacyOrdersList"></div>
+      </div>
+    </section>
+
+    <div id="orderModal" class="pharmacy-modal" hidden>
+      <div class="pharmacy-modal-backdrop" id="orderModalBackdrop"></div>
+      <div class="pharmacy-modal-content">
+        <div class="pharmacy-modal-header">
+          <h2 id="orderModalTitle">Prescription order</h2>
+          <button type="button" class="btn btn-ghost btn-sm" id="closeOrderModalBtn">Close</button>
+        </div>
+        <div class="pharmacy-modal-body" id="orderModalBody"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/pharmacy-portal.js"></script>
+</body>
+</html>

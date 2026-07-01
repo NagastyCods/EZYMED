@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     initVirtualQueue();
     initAppointments();
     initTelemedicine();
+    initPharmacyOrders();
+    initSecurityPanel();
   } catch {
     API.clearToken();
     window.location.href = '/login.html';

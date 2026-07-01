@@ -213,4 +213,14 @@ router.put('/insurance', async (req, res) => {
   }
 });
 
+router.get('/pharmacy-orders', async (req, res) => {
+  try {
+    const { getPatientPharmacyOrders } = require('../services/pharmacyService');
+    const orders = await getPatientPharmacyOrders(req.patientId);
+    res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

@@ -2,6 +2,9 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const Patient = require('../models/Patient');
 const auth = require('../middleware/auth');
+const { accountRequiresMfa, signMfaPendingToken } = require('../services/mfaService');
+const { seedDefaultConsents } = require('../services/consentService');
+const { logAudit } = require('../services/auditService');
 
 const router = express.Router();
 
@@ -37,6 +40,17 @@ router.post('/register', async (req, res) => {
       insurance: {},
     });
 
+    await seedDefaultConsents(patient._id, req);
+
+    await logAudit({
+      actorRole: 'patient',
+      actorId: patient._id.toString(),
+      actorName: `${patient.firstName} ${patient.lastName}`,
+      action: 'auth.register',
+      patientId: patient._id,
+      req,
+    });
+
     const token = signToken(patient._id);
 
     res.status(201).json({
@@ -57,16 +71,42 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const patient = await Patient.findOne({ email: email.toLowerCase() }).select('+password');
+    const patient = await Patient.findOne({ email: email.toLowerCase() }).select('+password +mfaSecret');
     if (!patient || !(await patient.comparePassword(password))) {
+      await logAudit({
+        actorRole: 'patient',
+        actorId: email,
+        action: 'auth.login_failed',
+        outcome: 'failure',
+        req,
+      });
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const token = signToken(patient._id);
+    if (accountRequiresMfa(patient)) {
+      return res.json({
+        message: 'MFA verification required',
+        requiresMfa: true,
+        mfaToken: signMfaPendingToken({
+          role: 'patient',
+          id: patient._id.toString(),
+          name: `${patient.firstName} ${patient.lastName}`,
+        }),
+      });
+    }
+
+    await logAudit({
+      actorRole: 'patient',
+      actorId: patient._id.toString(),
+      actorName: `${patient.firstName} ${patient.lastName}`,
+      action: 'auth.login',
+      patientId: patient._id,
+      req,
+    });
 
     res.json({
       message: 'Login successful',
-      token,
+      token: signToken(patient._id),
       patient: patient.toPublicJSON(),
     });
   } catch (err) {

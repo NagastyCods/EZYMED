@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { findDoctorById, DOCTORS } = require('../config/doctors');
 const DoctorAccount = require('../models/DoctorAccount');
+const { accountRequiresMfa, signMfaPendingToken } = require('../services/mfaService');
+const { logAudit } = require('../services/auditService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
 
@@ -11,26 +13,58 @@ const signDoctorToken = (doctor) =>
     { expiresIn: '12h' }
   );
 
-async function authenticateDoctor(doctorId, password) {
+async function authenticateDoctor(doctorId, password, req) {
   const doctor = findDoctorById(doctorId);
   if (!doctor) {
     throw new Error('Invalid doctor credentials');
   }
 
-  const account = await DoctorAccount.findOne({ doctorId: doctor.id, active: true }).select('+password');
+  const account = await DoctorAccount.findOne({ doctorId: doctor.id, active: true }).select('+password +mfaSecret');
   if (!account) {
     throw new Error('Invalid doctor credentials');
   }
 
   const valid = await account.comparePassword(password);
   if (!valid) {
+    await logAudit({
+      actorRole: 'doctor',
+      actorId: doctor.id,
+      actorName: doctor.name,
+      action: 'auth.login_failed',
+      outcome: 'failure',
+      req,
+    });
     throw new Error('Invalid doctor credentials');
   }
 
   account.lastLoginAt = new Date();
   await account.save();
 
-  return { doctor, token: signDoctorToken(doctor) };
+  if (accountRequiresMfa(account)) {
+    return {
+      requiresMfa: true,
+      mfaToken: signMfaPendingToken({
+        role: 'doctor',
+        id: doctor.id,
+        name: doctor.name,
+        department: doctor.department,
+      }),
+      doctor: { id: doctor.id, name: doctor.name, department: doctor.department, title: doctor.title },
+    };
+  }
+
+  await logAudit({
+    actorRole: 'doctor',
+    actorId: doctor.id,
+    actorName: doctor.name,
+    action: 'auth.login',
+    req,
+  });
+
+  return {
+    doctor,
+    token: signDoctorToken(doctor),
+  };
 }
 
 const doctorAuth = (req, res, next) => {
@@ -52,6 +86,7 @@ const doctorAuth = (req, res, next) => {
 
     req.doctor = doctor;
     req.doctorId = doctor.id;
+    req.userRole = 'doctor';
     next();
   } catch {
     return res.status(401).json({ message: 'Invalid or expired doctor token' });

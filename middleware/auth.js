@@ -18,6 +18,7 @@ const auth = async (req, res, next) => {
 
     req.patient = patient;
     req.patientId = patient._id;
+    req.userRole = 'patient';
     next();
   } catch {
     return res.status(401).json({ message: 'Invalid or expired token' });

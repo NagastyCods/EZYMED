@@ -45,6 +45,8 @@
         <button class="nav-item" data-section="contacts">Emergency Contacts</button>
         <button class="nav-item" data-section="appointments">Appointments</button>
         <button class="nav-item" data-section="telemedicine">Telemedicine</button>
+        <button class="nav-item" data-section="pharmacy">Pharmacy</button>
+        <button class="nav-item" data-section="security">Privacy &amp; Security</button>
       </nav>
     </aside>
 
@@ -517,6 +519,69 @@
           <div id="tmRecordsHistory"></div>
         </div>
       </section>
+
+      <!-- Pharmacy orders -->
+      <section id="section-pharmacy" class="section">
+        <div class="section-header">
+          <h2>Pharmacy orders</h2>
+        </div>
+        <div class="card queue-intro">
+          <p class="text-muted">Track e-prescriptions from your doctor — verification, preparation, and pickup or delivery updates.</p>
+        </div>
+        <div class="card">
+          <div id="pharmacyOrdersList"><p class="text-muted text-small">Loading pharmacy orders…</p></div>
+        </div>
+      </section>
+
+      <!-- Privacy & Security -->
+      <section id="section-security" class="section">
+        <div class="section-header">
+          <h2>Privacy &amp; Security</h2>
+        </div>
+
+        <div id="securityAlert"></div>
+
+        <div class="card">
+          <h3>Multi-factor authentication</h3>
+          <p class="text-muted text-small">Add an authenticator app (Google Authenticator, Authy, etc.) for stronger login protection.</p>
+          <p id="mfaStatusLabel" class="text-small">Loading…</p>
+          <div id="mfaSetupPanel">
+            <button type="button" class="btn btn-outline btn-sm" id="mfaSetupBtn">Set up MFA</button>
+            <div id="mfaSetupDetails" hidden style="margin-top:1rem">
+              <p class="text-small"><strong>Manual secret:</strong> <code id="mfaSecretDisplay"></code></p>
+              <p class="text-small text-muted" style="word-break:break-all" id="mfaOtpauth"></p>
+              <div class="form-group" style="margin-top:0.75rem">
+                <label>Verification code</label>
+                <input type="text" id="mfaConfirmCode" inputmode="numeric" maxlength="6" placeholder="6-digit code">
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" id="mfaConfirmBtn">Confirm MFA</button>
+            </div>
+          </div>
+          <div id="mfaManagePanel" hidden style="margin-top:0.75rem">
+            <button type="button" class="btn btn-ghost btn-sm text-danger" id="mfaDisableBtn">Disable MFA</button>
+          </div>
+        </div>
+
+        <div class="card card-spaced">
+          <h3>Consent management</h3>
+          <p class="text-muted text-small">Control how your health data is used. Clinicians need your consent before accessing records or conducting telemedicine.</p>
+          <div id="consentList"></div>
+        </div>
+
+        <div class="card card-spaced">
+          <h3>Your data rights</h3>
+          <p class="text-muted text-small">Export a copy of your records (NDPR / HIPAA-aligned data portability).</p>
+          <button type="button" class="btn btn-outline btn-sm" id="exportDataBtn">Download my data</button>
+        </div>
+
+        <div class="card card-spaced">
+          <div class="section-header section-header-compact">
+            <h3>Privacy notice</h3>
+            <button type="button" class="btn btn-outline btn-sm" id="loadPrivacyBtn">Load notice</button>
+          </div>
+          <div id="privacyNoticeContent"><p class="text-muted text-small">Click to view the current privacy notice and your rights.</p></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -542,6 +607,8 @@
   <script src="/js/queue.js"></script>
   <script src="/js/appointments.js"></script>
   <script src="/js/telemedicine.js"></script>
+  <script src="/js/pharmacy-orders.js"></script>
+  <script src="/js/security.js"></script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>

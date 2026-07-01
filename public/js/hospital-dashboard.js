@@ -22,20 +22,26 @@ document.addEventListener('DOMContentLoaded', () => {
   else showLogin();
 
   document.getElementById('hospitalLoginForm').addEventListener('submit', handleLogin);
+  document.getElementById('hospitalMfaForm')?.addEventListener('submit', handleHospitalMfaLogin);
   document.getElementById('hospitalLogoutBtn').addEventListener('click', () => {
     stopRefresh();
     HospitalAPI.clearToken();
     showLogin();
   });
   document.getElementById('refreshDashboardBtn').addEventListener('click', loadDashboard);
+  document.getElementById('loadAuditLogsBtn')?.addEventListener('click', loadAuditLogs);
 });
 
 function showLogin() {
   document.getElementById('hospitalLogin').hidden = false;
+  document.getElementById('hospitalLoginForm').hidden = false;
   document.getElementById('hospitalDashboard').hidden = true;
   document.getElementById('hospitalNav').hidden = true;
   document.getElementById('hospitalLoginAlert').innerHTML = '';
   document.getElementById('hospitalLoginForm').reset();
+  document.getElementById('hospitalMfaForm')?.reset();
+  document.getElementById('hospitalMfaForm').hidden = true;
+  sessionStorage.removeItem('ezymed_hospital_mfa_token');
 }
 
 function showDashboard() {
@@ -44,7 +50,38 @@ function showDashboard() {
   document.getElementById('hospitalNav').hidden = false;
   document.getElementById('hospitalLoginAlert').innerHTML = '';
   loadDashboard();
+  loadAuditLogs();
   startRefresh();
+}
+
+async function loadAuditLogs() {
+  const el = document.getElementById('auditLogsPanel');
+  if (!el) return;
+
+  try {
+    const data = await HospitalAPI.request('/api/security/audit-logs?limit=50');
+    if (!data.logs?.length) {
+      el.innerHTML = '<p class="empty-state">No audit events recorded yet.</p>';
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Outcome</th></tr></thead>
+        <tbody>
+          ${data.logs.map((l) => `
+            <tr>
+              <td>${new Date(l.createdAt).toLocaleString()}</td>
+              <td>${esc(l.actorName || l.actorRole)} <span class="text-small text-muted">(${l.actorRole})</span></td>
+              <td>${esc(l.action)}</td>
+              <td>${esc(l.resourceType || '—')}${l.resourceId ? ` · ${esc(l.resourceId)}` : ''}</td>
+              <td>${badge(l.outcome)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    el.innerHTML = `<p class="empty-state">${err.message}</p>`;
+  }
 }
 
 async function handleLogin(e) {
@@ -57,6 +94,33 @@ async function handleLogin(e) {
       method: 'POST',
       body: JSON.stringify({ email: form.email.value, password: form.password.value }),
     });
+
+    if (data.requiresMfa) {
+      sessionStorage.setItem('ezymed_hospital_mfa_token', data.mfaToken);
+      document.getElementById('hospitalLoginForm').hidden = true;
+      document.getElementById('hospitalMfaForm').hidden = false;
+      alertBox.innerHTML = '<div class="alert alert-success">Enter your authenticator code.</div>';
+      return;
+    }
+
+    HospitalAPI.setToken(data.token);
+    showDashboard();
+  } catch (err) {
+    alertBox.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+async function handleHospitalMfaLogin(e) {
+  e.preventDefault();
+  const alertBox = document.getElementById('hospitalLoginAlert');
+  const mfaToken = sessionStorage.getItem('ezymed_hospital_mfa_token');
+
+  try {
+    const data = await HospitalAPI.request('/api/security/mfa/verify-login', {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, code: e.target.code.value.trim() }),
+    });
+    sessionStorage.removeItem('ezymed_hospital_mfa_token');
     HospitalAPI.setToken(data.token);
     showDashboard();
   } catch (err) {

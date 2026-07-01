@@ -65,18 +65,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('closePatientChartBtn').addEventListener('click', closePatientChart);
   document.getElementById('patientChartBackdrop').addEventListener('click', closePatientChart);
   document.getElementById('refreshSummaryBtn').addEventListener('click', loadAiSummary);
+  document.getElementById('doctorMfaForm')?.addEventListener('submit', handleDoctorMfaLogin);
 
   loadDoctorList();
 });
 
 function showLogin() {
   document.getElementById('doctorLogin').hidden = false;
+  document.getElementById('doctorLoginForm').hidden = false;
   document.getElementById('doctorDashboard').hidden = true;
   document.getElementById('doctorRoom').hidden = true;
   document.getElementById('doctorNav').hidden = true;
   document.getElementById('patientChartModal').hidden = true;
   document.getElementById('doctorLoginAlert').innerHTML = '';
   document.getElementById('doctorLoginForm').reset();
+  document.getElementById('doctorMfaForm')?.reset();
+  document.getElementById('doctorMfaForm').hidden = true;
+  sessionStorage.removeItem('ezymed_doctor_mfa_token');
   chartPatientId = null;
 }
 
@@ -124,6 +129,35 @@ async function handleDoctorLogin(e) {
       method: 'POST',
       body: JSON.stringify({ doctorId: form.doctorId.value, password: form.password.value }),
     });
+
+    if (data.requiresMfa) {
+      sessionStorage.setItem('ezymed_doctor_mfa_token', data.mfaToken);
+      document.getElementById('doctorLoginForm').hidden = true;
+      document.getElementById('doctorMfaForm').hidden = false;
+      alertBox.innerHTML = '<div class="alert alert-success">Enter your authenticator code.</div>';
+      return;
+    }
+
+    DoctorAPI.setToken(data.token);
+    DoctorAPI.setDoctor(data.doctor);
+    showDashboard();
+  } catch (err) {
+    alertBox.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+async function handleDoctorMfaLogin(e) {
+  e.preventDefault();
+  const alertBox = document.getElementById('doctorLoginAlert');
+  const form = e.target;
+  const mfaToken = sessionStorage.getItem('ezymed_doctor_mfa_token');
+
+  try {
+    const data = await DoctorAPI.request('/api/security/mfa/verify-login', {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, code: form.code.value.trim() }),
+    });
+    sessionStorage.removeItem('ezymed_doctor_mfa_token');
     DoctorAPI.setToken(data.token);
     DoctorAPI.setDoctor(data.doctor);
     showDashboard();

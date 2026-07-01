@@ -32,11 +32,12 @@ router.post('/request', async (req, res) => {
 
     const consultation = await requestConsultation(req.patientId, {
       mode, doctorId, department, reason, appointmentId,
-    });
+    }, req);
 
     res.status(201).json({ message: 'Consultation requested', consultation });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    const status = err.code === 'CONSENT_REQUIRED' ? 403 : 400;
+    res.status(status).json({ message: err.message, code: err.code });
   }
 });
 
@@ -74,7 +75,7 @@ router.get('/:id/messages', async (req, res) => {
 
 router.patch('/:id/end', async (req, res) => {
   try {
-    const consultation = await endConsultation(req.patientId, req.params.id);
+    const consultation = await endConsultation(req.patientId, req.params.id, req);
     res.json({ message: 'Consultation ended', consultation });
   } catch (err) {
     res.status(400).json({ message: err.message });

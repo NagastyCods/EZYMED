@@ -17,6 +17,8 @@ const doctorAccountSchema = new mongoose.Schema({
   },
   active: { type: Boolean, default: true },
   lastLoginAt: { type: Date },
+  mfaEnabled: { type: Boolean, default: false },
+  mfaSecret: { type: String, select: false },
 }, { timestamps: true });
 
 doctorAccountSchema.pre('save', async function () {

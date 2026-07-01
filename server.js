@@ -6,6 +6,8 @@ const path = require('path');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const { seedStaffAccounts } = require('./services/staffSeedService');
+const { backfillPrescriptions } = require('./services/pharmacyService');
+const { seedExistingPatientConsents } = require('./services/consentService');
 
 const authRoutes = require('./routes/auth');
 const patientRoutes = require('./routes/patient');
@@ -15,7 +17,11 @@ const queueRoutes = require('./routes/queue');
 const consultationRoutes = require('./routes/consultations');
 const doctorRoutes = require('./routes/doctor');
 const hospitalRoutes = require('./routes/hospital');
+const pharmacyRoutes = require('./routes/pharmacy');
 const satisfactionRoutes = require('./routes/satisfaction');
+const securityRoutes = require('./routes/security');
+const complianceRoutes = require('./routes/compliance');
+const securityHeaders = require('./middleware/securityHeaders');
 const { setupTelemedicineSockets } = require('./services/socketHandlers');
 
 const app = express();
@@ -26,6 +32,8 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
+app.use(securityHeaders);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads/consultations', express.static(path.join(__dirname, 'uploads', 'consultations')));
@@ -38,7 +46,10 @@ app.use('/api/queue', queueRoutes);
 app.use('/api/consultations', consultationRoutes);
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/hospital', hospitalRoutes);
+app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/satisfaction', satisfactionRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/compliance', complianceRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'EZYMED Healthcare Platform' });
@@ -49,6 +60,8 @@ app.set('io', io);
 
 connectDB()
   .then(() => seedStaffAccounts())
+  .then(() => seedExistingPatientConsents())
+  .then(() => backfillPrescriptions())
   .then(() => {
     server.listen(PORT, () => {
       console.log(`EZYMED server running at http://localhost:${PORT}`);
