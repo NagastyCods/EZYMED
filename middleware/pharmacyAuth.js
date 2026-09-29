@@ -2,13 +2,13 @@ const jwt = require('jsonwebtoken');
 const { findPharmacyById, PHARMACIES } = require('../config/pharmacies');
 const PharmacistAccount = require('../models/PharmacistAccount');
 const { logAudit } = require('../services/auditService');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
+const { getJwtSecret } = require('../config/secrets');
+const { accountRequiresMfa, signMfaPendingToken } = require('../services/mfaService');
 
 const signPharmacyToken = (pharmacy) =>
   jwt.sign(
     { id: pharmacy.id, role: 'pharmacist', name: pharmacy.name },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '12h' }
   );
 
@@ -16,7 +16,7 @@ async function authenticatePharmacist(pharmacyId, password, req) {
   const pharmacy = findPharmacyById(pharmacyId);
   if (!pharmacy) throw new Error('Invalid pharmacy credentials');
 
-  const account = await PharmacistAccount.findOne({ pharmacyId: pharmacy.id, active: true }).select('+password');
+  const account = await PharmacistAccount.findOne({ pharmacyId: pharmacy.id, active: true }).select('+password +mfaSecret');
   if (!account) throw new Error('Invalid pharmacy credentials');
 
   const valid = await account.comparePassword(password);
@@ -34,6 +34,18 @@ async function authenticatePharmacist(pharmacyId, password, req) {
 
   account.lastLoginAt = new Date();
   await account.save();
+
+  if (accountRequiresMfa(account)) {
+    return {
+      requiresMfa: true,
+      mfaToken: signMfaPendingToken({
+        role: 'pharmacist',
+        id: pharmacy.id,
+        name: pharmacy.name,
+      }),
+      pharmacy: { id: pharmacy.id, name: pharmacy.name, address: pharmacy.address, phone: pharmacy.phone },
+    };
+  }
 
   await logAudit({
     actorRole: 'pharmacist',
@@ -53,7 +65,7 @@ const pharmacyAuth = (req, res, next) => {
       return res.status(401).json({ message: 'Pharmacy authentication required' });
     }
 
-    const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
+    const decoded = jwt.verify(header.split(' ')[1], getJwtSecret());
     if (decoded.role !== 'pharmacist') {
       return res.status(403).json({ message: 'Pharmacy access only' });
     }

@@ -71,6 +71,11 @@ const patientSchema = new mongoose.Schema({
   medicalHistory: [medicalHistorySchema],
   mfaEnabled: { type: Boolean, default: false },
   mfaSecret: { type: String, select: false },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String, select: false },
+  emailVerificationExpires: { type: Date, select: false },
+  passwordResetToken: { type: String, select: false },
+  passwordResetExpires: { type: Date, select: false },
 }, { timestamps: true });
 
 patientSchema.virtual('fullName').get(function () {

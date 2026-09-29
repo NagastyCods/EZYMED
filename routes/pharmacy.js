@@ -4,6 +4,9 @@ const {
   pharmacyAuth,
   PHARMACIES,
 } = require('../middleware/pharmacyAuth');
+const { authRateLimit } = require('../middleware/rateLimit');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 const {
   getPharmacyDashboard,
   getOrders,
@@ -27,14 +30,24 @@ router.get('/list', (_req, res) => {
   });
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authRateLimit, async (req, res) => {
   try {
     const { pharmacyId, password } = req.body;
     if (!pharmacyId || !password) {
       return res.status(400).json({ message: 'Pharmacy and password are required' });
     }
 
-    const { pharmacy, token } = await authenticatePharmacist(pharmacyId, password, req);
+    const result = await authenticatePharmacist(pharmacyId, password, req);
+    if (result.requiresMfa) {
+      return res.json({
+        message: 'MFA verification required',
+        requiresMfa: true,
+        mfaToken: result.mfaToken,
+        pharmacy: result.pharmacy,
+      });
+    }
+
+    const { pharmacy, token } = result;
     res.json({
       message: 'Login successful',
       token,
@@ -47,7 +60,7 @@ router.post('/auth/login', async (req, res) => {
 
 router.use(pharmacyAuth);
 
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const data = await getPharmacyDashboard(req.pharmacyId);
     res.json(data);
@@ -56,7 +69,7 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-router.get('/orders', async (req, res) => {
+router.get('/orders', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const orders = await getOrders(req.pharmacyId, { status: req.query.status });
     res.json({ orders });
@@ -65,7 +78,7 @@ router.get('/orders', async (req, res) => {
   }
 });
 
-router.get('/orders/:id', async (req, res) => {
+router.get('/orders/:id', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await getOrder(req.pharmacyId, req.params.id);
     res.json({ order });
@@ -74,7 +87,7 @@ router.get('/orders/:id', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/claim', async (req, res) => {
+router.patch('/orders/:id/claim', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await claimOrder(req.pharmacyId, req.params.id, req);
     res.json({ message: 'Prescription claimed', order });
@@ -83,7 +96,7 @@ router.patch('/orders/:id/claim', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/verify', async (req, res) => {
+router.patch('/orders/:id/verify', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await verifyOrder(req.pharmacyId, req.params.id, req.body, req);
     res.json({ message: 'Medication verified', order });
@@ -92,7 +105,7 @@ router.patch('/orders/:id/verify', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/prepare', async (req, res) => {
+router.patch('/orders/:id/prepare', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await prepareOrder(req.pharmacyId, req.params.id, req);
     res.json({ message: 'Preparation started', order });
@@ -101,7 +114,7 @@ router.patch('/orders/:id/prepare', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/ready', async (req, res) => {
+router.patch('/orders/:id/ready', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await markReady(req.pharmacyId, req.params.id, req);
     res.json({ message: 'Order marked ready', order });
@@ -110,7 +123,7 @@ router.patch('/orders/:id/ready', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/delivery', async (req, res) => {
+router.patch('/orders/:id/delivery', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await coordinateDelivery(req.pharmacyId, req.params.id, req.body, req);
     res.json({ message: 'Delivery coordinated', order });
@@ -119,7 +132,7 @@ router.patch('/orders/:id/delivery', async (req, res) => {
   }
 });
 
-router.post('/orders/:id/notify', async (req, res) => {
+router.post('/orders/:id/notify', requirePermission(PERMISSIONS.PHARMACY_NOTIFY), async (req, res) => {
   try {
     const order = await notifyPatient(req.pharmacyId, req.params.id, req.body, req);
     res.json({ message: 'Patient notified', order });
@@ -128,7 +141,7 @@ router.post('/orders/:id/notify', async (req, res) => {
   }
 });
 
-router.patch('/orders/:id/complete', async (req, res) => {
+router.patch('/orders/:id/complete', requirePermission(PERMISSIONS.PHARMACY_ORDERS), async (req, res) => {
   try {
     const order = await completeOrder(req.pharmacyId, req.params.id, req);
     res.json({ message: 'Order completed', order });

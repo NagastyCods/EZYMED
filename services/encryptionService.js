@@ -1,12 +1,8 @@
 const crypto = require('crypto');
+const { getEncryptionKey } = require('../config/secrets');
 
 const ALGORITHM = 'aes-256-gcm';
 const PREFIX = 'enc:v1:';
-
-function getEncryptionKey() {
-  const source = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
-  return crypto.createHash('sha256').update(String(source)).digest();
-}
 
 function encrypt(plaintext) {
   if (plaintext == null || plaintext === '') return plaintext;

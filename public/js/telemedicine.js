@@ -10,6 +10,7 @@ function initTelemedicine() {
   document.getElementById('tmRequestForm').addEventListener('submit', handleRequestConsultation);
   document.getElementById('tmEndBtn').addEventListener('click', endActiveConsultation);
   document.getElementById('tmChatForm').addEventListener('submit', sendChatMessage);
+  document.getElementById('tmClinicalRecords')?.addEventListener('click', handleClinicalFileDownload);
 
   refreshTelemedicineState();
   loadClinicalRecords();
@@ -202,7 +203,7 @@ function renderClinicalRecords(records) {
     } else if (r.type === 'referral') {
       detail = `${r.details.facility || ''} ${r.details.reason || ''}`.trim();
     } else if (r.type === 'file' && r.filePath) {
-      detail = `<a href="/uploads/consultations/${r.filePath}" target="_blank" rel="noopener">Download ${r.fileName || r.title}</a>`;
+      detail = `<button type="button" class="btn-link clinical-file-download" data-record-id="${r._id}" data-filename="${escapeHtml(r.fileName || r.title || 'clinical-file')}">Download ${escapeHtml(r.fileName || r.title)}</button>`;
     }
 
     return `
@@ -215,6 +216,18 @@ function renderClinicalRecords(records) {
         </div>
       </div>`;
   }).join('');
+}
+
+async function handleClinicalFileDownload(e) {
+  const btn = e.target.closest('.clinical-file-download');
+  if (!btn) return;
+  e.preventDefault();
+
+  try {
+    await API.downloadClinicalFile(btn.dataset.recordId, btn.dataset.filename);
+  } catch (err) {
+    alert(err.message || 'Download failed');
+  }
 }
 
 async function loadClinicalRecords() {

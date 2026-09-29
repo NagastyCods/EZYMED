@@ -1,16 +1,18 @@
 const express = require('express');
 const Patient = require('../models/Patient');
 const auth = require('../middleware/auth');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 
 const router = express.Router();
 
 router.use(auth);
 
-router.get('/profile', async (req, res) => {
+router.get('/profile', requirePermission(PERMISSIONS.PROFILE_READ), async (req, res) => {
   res.json({ patient: req.patient.toPublicJSON() });
 });
 
-router.put('/profile', async (req, res) => {
+router.put('/profile', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const allowed = [
       'firstName', 'lastName', 'phone', 'dateOfBirth', 'gender',
@@ -34,7 +36,7 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-router.post('/allergies', async (req, res) => {
+router.post('/allergies', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const { allergen, severity, reaction } = req.body;
     if (!allergen) return res.status(400).json({ message: 'Allergen is required' });
@@ -47,7 +49,7 @@ router.post('/allergies', async (req, res) => {
   }
 });
 
-router.put('/allergies/:id', async (req, res) => {
+router.put('/allergies/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const allergy = req.patient.allergies.id(req.params.id);
     if (!allergy) return res.status(404).json({ message: 'Allergy not found' });
@@ -60,7 +62,7 @@ router.put('/allergies/:id', async (req, res) => {
   }
 });
 
-router.delete('/allergies/:id', async (req, res) => {
+router.delete('/allergies/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const allergy = req.patient.allergies.id(req.params.id);
     if (!allergy) return res.status(404).json({ message: 'Allergy not found' });
@@ -73,7 +75,7 @@ router.delete('/allergies/:id', async (req, res) => {
   }
 });
 
-router.post('/medications', async (req, res) => {
+router.post('/medications', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const { name, dosage, frequency, prescribedBy, startDate } = req.body;
     if (!name) return res.status(400).json({ message: 'Medication name is required' });
@@ -89,7 +91,7 @@ router.post('/medications', async (req, res) => {
   }
 });
 
-router.put('/medications/:id', async (req, res) => {
+router.put('/medications/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const med = req.patient.medications.id(req.params.id);
     if (!med) return res.status(404).json({ message: 'Medication not found' });
@@ -103,7 +105,7 @@ router.put('/medications/:id', async (req, res) => {
   }
 });
 
-router.delete('/medications/:id', async (req, res) => {
+router.delete('/medications/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const med = req.patient.medications.id(req.params.id);
     if (!med) return res.status(404).json({ message: 'Medication not found' });
@@ -116,7 +118,7 @@ router.delete('/medications/:id', async (req, res) => {
   }
 });
 
-router.post('/medical-history', async (req, res) => {
+router.post('/medical-history', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const { condition, diagnosedDate, status, notes } = req.body;
     if (!condition) return res.status(400).json({ message: 'Condition is required' });
@@ -132,7 +134,7 @@ router.post('/medical-history', async (req, res) => {
   }
 });
 
-router.put('/medical-history/:id', async (req, res) => {
+router.put('/medical-history/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const record = req.patient.medicalHistory.id(req.params.id);
     if (!record) return res.status(404).json({ message: 'Record not found' });
@@ -146,7 +148,7 @@ router.put('/medical-history/:id', async (req, res) => {
   }
 });
 
-router.delete('/medical-history/:id', async (req, res) => {
+router.delete('/medical-history/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const record = req.patient.medicalHistory.id(req.params.id);
     if (!record) return res.status(404).json({ message: 'Record not found' });
@@ -159,7 +161,7 @@ router.delete('/medical-history/:id', async (req, res) => {
   }
 });
 
-router.post('/emergency-contacts', async (req, res) => {
+router.post('/emergency-contacts', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const { name, relationship, phone, email } = req.body;
     if (!name || !relationship || !phone) {
@@ -174,7 +176,7 @@ router.post('/emergency-contacts', async (req, res) => {
   }
 });
 
-router.put('/emergency-contacts/:id', async (req, res) => {
+router.put('/emergency-contacts/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const contact = req.patient.emergencyContacts.id(req.params.id);
     if (!contact) return res.status(404).json({ message: 'Contact not found' });
@@ -187,7 +189,7 @@ router.put('/emergency-contacts/:id', async (req, res) => {
   }
 });
 
-router.delete('/emergency-contacts/:id', async (req, res) => {
+router.delete('/emergency-contacts/:id', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     const contact = req.patient.emergencyContacts.id(req.params.id);
     if (!contact) return res.status(404).json({ message: 'Contact not found' });
@@ -200,7 +202,7 @@ router.delete('/emergency-contacts/:id', async (req, res) => {
   }
 });
 
-router.put('/insurance', async (req, res) => {
+router.put('/insurance', requirePermission(PERMISSIONS.PROFILE_WRITE), async (req, res) => {
   try {
     req.patient.insurance = { ...req.patient.insurance?.toObject?.() || req.patient.insurance || {}, ...req.body };
     if (req.body.expiryDate) {
@@ -213,7 +215,7 @@ router.put('/insurance', async (req, res) => {
   }
 });
 
-router.get('/pharmacy-orders', async (req, res) => {
+router.get('/pharmacy-orders', requirePermission(PERMISSIONS.PROFILE_READ), async (req, res) => {
   try {
     const { getPatientPharmacyOrders } = require('../services/pharmacyService');
     const orders = await getPatientPharmacyOrders(req.patientId);

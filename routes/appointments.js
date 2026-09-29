@@ -1,6 +1,8 @@
 const express = require('express');
 const Appointment = require('../models/Appointment');
 const auth = require('../middleware/auth');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 const {
   DEPARTMENTS,
   listDoctors,
@@ -14,6 +16,7 @@ const {
 const router = express.Router();
 
 router.use(auth);
+router.use(requirePermission(PERMISSIONS.APPOINTMENTS_MANAGE));
 
 router.get('/departments', (_req, res) => {
   res.json({ departments: DEPARTMENTS });

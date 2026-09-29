@@ -4,7 +4,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test tests/complianceExport.test.js tests/rbac.test.js tests/consent.test.js tests/pharmacyStatus.test.js tests/accountLifecycle.test.js"
   },
   "keywords": [
     "healthcare",
@@ -14,16 +15,22 @@
   "author": "",
   "license": "ISC",
   "description": "EZYMED - AI-powered healthcare platform patient portal MVP",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.3",
     "multer": "^2.2.0",
+    "nodemailer": "^10.0.12",
     "openai": "^6.45.0",
     "otplib": "^13.4.1",
+    "pino": "^9.9.0",
+    "pino-pretty": "^13.1.1",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
     "uuid": "^14.0.1"

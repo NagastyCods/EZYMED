@@ -3,6 +3,7 @@ const ClinicalRecord = require('../models/ClinicalRecord');
 const Patient = require('../models/Patient');
 const { findPharmacyById } = require('../config/pharmacies');
 const { logAudit } = require('./auditService');
+const { sendPharmacyNotification } = require('./notificationService');
 
 const STATUS_FLOW = {
   received: ['verified', 'cancelled'],
@@ -96,6 +97,9 @@ async function getOrders(pharmacyId, { status } = {}) {
 async function getOrder(pharmacyId, orderId) {
   const order = await PharmacyOrder.findById(orderId).populate('patient', 'firstName lastName email phone');
   if (!order) throw new Error('Order not found');
+  if (order.pharmacyId && order.pharmacyId !== pharmacyId) {
+    throw new Error('This order belongs to another pharmacy');
+  }
   return order;
 }
 
@@ -182,6 +186,15 @@ async function notifyPatient(pharmacyId, orderId, { message }, req) {
   order.patientNotifiedAt = new Date();
   await order.save();
 
+  const populated = await order.populate('patient', 'firstName lastName email phone');
+  if (populated.patient?.email) {
+    try {
+      await sendPharmacyNotification(populated.patient, order.notificationMessage);
+    } catch {
+      /* notification failure should not block workflow */
+    }
+  }
+
   await logAudit({
     actorRole: 'pharmacist',
     actorId: pharmacyId,
@@ -192,7 +205,7 @@ async function notifyPatient(pharmacyId, orderId, { message }, req) {
     req,
   });
 
-  return order.populate('patient', 'firstName lastName email phone');
+  return populated;
 }
 
 async function completeOrder(pharmacyId, orderId, req) {
@@ -260,4 +273,5 @@ module.exports = {
   notifyPatient,
   completeOrder,
   getPatientPharmacyOrders,
+  STATUS_FLOW,
 };

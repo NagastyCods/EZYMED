@@ -39,6 +39,13 @@
           </div>
           <button type="submit" class="btn btn-primary btn-block">Sign in</button>
         </form>
+        <form id="pharmacyMfaForm" hidden>
+          <div class="form-group">
+            <label>Authenticator code</label>
+            <input type="text" name="code" inputmode="numeric" maxlength="6" required placeholder="6-digit code" autocomplete="one-time-code">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Verify &amp; sign in</button>
+        </form>
         <p class="auth-footer"><a href="/">← Patient portal</a></p>
       </div>
     </section>

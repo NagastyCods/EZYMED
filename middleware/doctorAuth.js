@@ -3,13 +3,12 @@ const { findDoctorById, DOCTORS } = require('../config/doctors');
 const DoctorAccount = require('../models/DoctorAccount');
 const { accountRequiresMfa, signMfaPendingToken } = require('../services/mfaService');
 const { logAudit } = require('../services/auditService');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
+const { getJwtSecret } = require('../config/secrets');
 
 const signDoctorToken = (doctor) =>
   jwt.sign(
     { id: doctor.id, role: 'doctor', name: doctor.name, department: doctor.department },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '12h' }
   );
 
@@ -74,7 +73,7 @@ const doctorAuth = (req, res, next) => {
       return res.status(401).json({ message: 'Doctor authentication required' });
     }
 
-    const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
+    const decoded = jwt.verify(header.split(' ')[1], getJwtSecret());
     if (decoded.role !== 'doctor') {
       return res.status(403).json({ message: 'Doctor access only' });
     }
@@ -94,7 +93,7 @@ const doctorAuth = (req, res, next) => {
 };
 
 function verifySocketToken(token) {
-  const decoded = jwt.verify(token, JWT_SECRET);
+  const decoded = jwt.verify(token, getJwtSecret());
   if (decoded.role === 'doctor') {
     const doctor = findDoctorById(decoded.id);
     if (!doctor) throw new Error('Invalid doctor');

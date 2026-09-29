@@ -1,5 +1,8 @@
 const express = require('express');
 const { authenticateAdmin, adminAuth } = require('../middleware/adminAuth');
+const { authRateLimit } = require('../middleware/rateLimit');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 const {
   getDashboardOverview,
   getLiveQueue,
@@ -15,7 +18,7 @@ const {
 
 const router = express.Router();
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authRateLimit, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -41,7 +44,7 @@ router.post('/auth/login', async (req, res) => {
 
 router.use(adminAuth);
 
-router.get('/dashboard', async (_req, res) => {
+router.get('/dashboard', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const data = await getDashboardOverview();
     res.json(data);
@@ -50,7 +53,7 @@ router.get('/dashboard', async (_req, res) => {
   }
 });
 
-router.get('/queue', async (_req, res) => {
+router.get('/queue', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const queue = await getLiveQueue();
     res.json({ queue });
@@ -59,7 +62,7 @@ router.get('/queue', async (_req, res) => {
   }
 });
 
-router.get('/consultations', async (_req, res) => {
+router.get('/consultations', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const consultations = await getActiveConsultations();
     res.json({ consultations });
@@ -68,7 +71,7 @@ router.get('/consultations', async (_req, res) => {
   }
 });
 
-router.get('/waiting-times', async (_req, res) => {
+router.get('/waiting-times', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const waitingTimes = await getWaitingTimes();
     res.json({ waitingTimes });
@@ -77,7 +80,7 @@ router.get('/waiting-times', async (_req, res) => {
   }
 });
 
-router.get('/doctors', async (_req, res) => {
+router.get('/doctors', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const doctors = await getDoctorAvailability();
     res.json({ doctors });
@@ -86,7 +89,7 @@ router.get('/doctors', async (_req, res) => {
   }
 });
 
-router.get('/beds', async (_req, res) => {
+router.get('/beds', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const bedOccupancy = await getBedOccupancy();
     res.json(bedOccupancy);
@@ -95,7 +98,7 @@ router.get('/beds', async (_req, res) => {
   }
 });
 
-router.patch('/beds/:wardId', async (req, res) => {
+router.patch('/beds/:wardId', requirePermission(PERMISSIONS.HOSPITAL_BEDS), async (req, res) => {
   try {
     const { occupiedBeds } = req.body;
     if (occupiedBeds === undefined) {
@@ -109,7 +112,7 @@ router.patch('/beds/:wardId', async (req, res) => {
   }
 });
 
-router.get('/appointments/today', async (_req, res) => {
+router.get('/appointments/today', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const data = await getDailyAppointments();
     res.json(data);
@@ -118,7 +121,7 @@ router.get('/appointments/today', async (_req, res) => {
   }
 });
 
-router.get('/analytics/queue', async (_req, res) => {
+router.get('/analytics/queue', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const analytics = await getQueueAnalytics();
     res.json(analytics);
@@ -127,7 +130,7 @@ router.get('/analytics/queue', async (_req, res) => {
   }
 });
 
-router.get('/satisfaction', async (_req, res) => {
+router.get('/satisfaction', requirePermission(PERMISSIONS.HOSPITAL_MONITOR), async (_req, res) => {
   try {
     const satisfaction = await getPatientSatisfaction();
     res.json(satisfaction);

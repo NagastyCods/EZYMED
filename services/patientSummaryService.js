@@ -4,6 +4,8 @@ const SymptomAssessment = require('../models/SymptomAssessment');
 const Appointment = require('../models/Appointment');
 const ClinicalRecord = require('../models/ClinicalRecord');
 const DoctorNote = require('../models/DoctorNote');
+const { decrypt } = require('./encryptionService');
+const { OPENAI_PHI_POLICY } = require('./complianceService');
 
 const SYSTEM_PROMPT = `You are a clinical documentation assistant for EZYMED.
 Generate a concise pre-visit summary for a treating physician.
@@ -33,10 +35,13 @@ const RESPONSE_SCHEMA = {
   additionalProperties: false,
 };
 
+function isOpenAiPhiEnabled() {
+  return process.env.OPENAI_PHI_ENABLED === 'true' && Boolean(process.env.OPENAI_API_KEY);
+}
+
 function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey });
+  if (!isOpenAiPhiEnabled()) return null;
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
 function buildPatientContext(patient, assessments, appointments, records, notes) {
@@ -70,11 +75,14 @@ function buildPatientContext(patient, assessments, appointments, records, notes)
       title: r.title,
       date: r.createdAt,
     })),
-    recentNotes: notes.slice(0, 3).map((n) => ({
-      title: n.title,
-      excerpt: n.content.slice(0, 120),
-      date: n.createdAt,
-    })),
+    recentNotes: notes.slice(0, 3).map((n) => {
+      const content = decrypt(n.content);
+      return {
+        title: n.title,
+        excerpt: content.slice(0, 120),
+        date: n.createdAt,
+      };
+    }),
   };
 }
 
@@ -113,6 +121,7 @@ function buildFallbackSummary(patient, assessments) {
       ? [`Review triage outcome: ${latest.department}`, 'Confirm allergies and current medications']
       : ['Confirm allergies and current medications', 'Document chief complaint'],
     provider: 'rules-fallback',
+    phiPolicy: OPENAI_PHI_POLICY.summary,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -157,6 +166,7 @@ async function generatePatientSummary(patientId) {
       ...parsed,
       provider: 'openai',
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      phiPolicy: OPENAI_PHI_POLICY.summary,
       generatedAt: new Date().toISOString(),
     };
   } catch {
@@ -164,4 +174,4 @@ async function generatePatientSummary(patientId) {
   }
 }
 
-module.exports = { generatePatientSummary };
+module.exports = { generatePatientSummary, isOpenAiPhiEnabled, OPENAI_PHI_POLICY };

@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
+const logger = require('../services/logger');
 
 const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ezymed';
+  const uri = process.env.MONGODB_URI;
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 5000,
   });
-  console.log('MongoDB connected');
+  logger.info('MongoDB connected');
 };
 
 module.exports = connectDB;

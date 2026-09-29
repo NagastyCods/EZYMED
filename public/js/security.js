@@ -122,15 +122,26 @@ window.revokeConsent = async (consentType) => {
 
 async function exportPatientData() {
   try {
-    const data = await API.request('/api/compliance/patient/export');
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const token = localStorage.getItem('ezymed_token');
+    if (!token) throw new Error('Authentication required');
+
+    const res = await fetch('/api/compliance/patient/export', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Export failed');
+    }
+
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ezymed-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `ezymed-export-${new Date().toISOString().slice(0, 10)}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
-    showAlert(document.getElementById('securityAlert'), 'Your data export has downloaded.', 'success');
+    showAlert(document.getElementById('securityAlert'), 'Your data export has downloaded as a PDF.', 'success');
   } catch (err) {
     showAlert(document.getElementById('securityAlert'), err.message);
   }

@@ -19,18 +19,19 @@ const {
 } = require('../services/consentService');
 const { getAuditLogs } = require('../services/auditService');
 const { signDoctorToken } = require('../middleware/doctorAuth');
+const { signPharmacyToken, pharmacyAuth } = require('../middleware/pharmacyAuth');
 const jwt = require('jsonwebtoken');
 const Patient = require('../models/Patient');
 const { findDoctorById } = require('../config/doctors');
+const { getJwtSecret } = require('../config/secrets');
+const { mfaRateLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
-
 const signPatientToken = (id) =>
-  jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
+  jwt.sign({ id }, getJwtSecret(), { expiresIn: '7d' });
 
-router.post('/mfa/verify-login', async (req, res) => {
+router.post('/mfa/verify-login', mfaRateLimit, async (req, res) => {
   try {
     const { mfaToken, code } = req.body;
     if (!mfaToken || !code) {
@@ -66,10 +67,21 @@ router.post('/mfa/verify-login', async (req, res) => {
       const publicAdmin = { id: admin._id.toString(), email: admin.email, name: admin.name };
       const token = jwt.sign(
         { id: publicAdmin.id, role: 'admin', email: publicAdmin.email, name: publicAdmin.name },
-        JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: '12h' }
       );
       return res.json({ message: 'Login successful', token, admin: publicAdmin });
+    }
+
+    if (pending.role === 'pharmacist') {
+      const { findPharmacyById } = require('../config/pharmacies');
+      const pharmacy = findPharmacyById(pending.id);
+      if (!pharmacy) return res.status(401).json({ message: 'Pharmacy not found' });
+      return res.json({
+        message: 'Login successful',
+        token: signPharmacyToken(pharmacy),
+        pharmacy: { id: pharmacy.id, name: pharmacy.name, address: pharmacy.address, phone: pharmacy.phone },
+      });
     }
 
     res.status(400).json({ message: 'Unsupported role' });
@@ -86,9 +98,10 @@ function anyAuth(req, res, next) {
 
   const token = header.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     if (decoded.role === 'doctor') return doctorAuth(req, res, next);
     if (decoded.role === 'admin') return adminAuth(req, res, next);
+    if (decoded.role === 'pharmacist') return pharmacyAuth(req, res, next);
     return auth(req, res, next);
   } catch {
     return auth(req, res, next);
@@ -98,7 +111,13 @@ function anyAuth(req, res, next) {
 router.get('/mfa/status', anyAuth, async (req, res) => {
   try {
     const role = resolveRole(req);
-    const id = role === 'patient' ? req.patientId : role === 'doctor' ? req.doctorId : req.admin.id;
+    const id = role === 'patient'
+      ? req.patientId
+      : role === 'doctor'
+        ? req.doctorId
+        : role === 'pharmacist'
+          ? req.pharmacyId
+          : req.admin.id;
     const status = await getMfaStatus(role, id);
     res.json(status);
   } catch (err) {
@@ -118,6 +137,9 @@ router.post('/mfa/setup', anyAuth, requirePermission(PERMISSIONS.MFA_MANAGE), as
     } else if (role === 'doctor') {
       id = req.doctorId;
       label = req.doctor.name;
+    } else if (role === 'pharmacist') {
+      id = req.pharmacyId;
+      label = req.pharmacy.name;
     } else {
       id = req.admin.id;
       label = req.admin.email;
@@ -140,7 +162,13 @@ router.post('/mfa/confirm', anyAuth, requirePermission(PERMISSIONS.MFA_MANAGE), 
     if (!code) return res.status(400).json({ message: 'Verification code is required' });
 
     const role = resolveRole(req);
-    const id = role === 'patient' ? req.patientId : role === 'doctor' ? req.doctorId : req.admin.id;
+    const id = role === 'patient'
+      ? req.patientId
+      : role === 'doctor'
+        ? req.doctorId
+        : role === 'pharmacist'
+          ? req.pharmacyId
+          : req.admin.id;
     const result = await confirmMfaSetup(role, id, code, req);
     res.json({ message: 'Multi-factor authentication enabled', ...result });
   } catch (err) {
@@ -154,7 +182,13 @@ router.post('/mfa/disable', anyAuth, requirePermission(PERMISSIONS.MFA_MANAGE), 
     if (!code) return res.status(400).json({ message: 'Verification code is required' });
 
     const role = resolveRole(req);
-    const id = role === 'patient' ? req.patientId : role === 'doctor' ? req.doctorId : req.admin.id;
+    const id = role === 'patient'
+      ? req.patientId
+      : role === 'doctor'
+        ? req.doctorId
+        : role === 'pharmacist'
+          ? req.pharmacyId
+          : req.admin.id;
     const result = await disableMfa(role, id, code, req);
     res.json({ message: 'Multi-factor authentication disabled', ...result });
   } catch (err) {

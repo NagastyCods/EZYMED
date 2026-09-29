@@ -9,6 +9,71 @@ const CONSENT_LABELS = {
   research: 'Anonymized data for quality improvement',
 };
 
+const CONSENT_DESCRIPTIONS = {
+  treatment: 'Required to use EZYMED for appointments, symptom checks, and clinical services.',
+  data_sharing: 'Allow assigned doctors to view your medical records during care.',
+  telemedicine: 'Enable video, voice, and chat consultations with clinicians.',
+  research: 'Optional use of anonymized data for service quality improvement.',
+};
+
+const REQUIRED_AT_REGISTRATION = ['treatment'];
+
+function getConsentOptionsForRegistration() {
+  return CONSENT_TYPES.map((type) => ({
+    consentType: type,
+    label: CONSENT_LABELS[type],
+    description: CONSENT_DESCRIPTIONS[type],
+    required: REQUIRED_AT_REGISTRATION.includes(type),
+  }));
+}
+
+async function applyRegistrationConsents(patientId, consents = {}, req) {
+  if (consents.treatment !== true) {
+    const err = new Error('Treatment consent is required to create an account');
+    err.code = 'CONSENT_REQUIRED';
+    throw err;
+  }
+
+  const values = {
+    treatment: true,
+    telemedicine: consents.telemedicine === true,
+    data_sharing: consents.data_sharing === true,
+    research: consents.research === true,
+  };
+
+  for (const consentType of CONSENT_TYPES) {
+    const granted = values[consentType] === true;
+    await ConsentRecord.findOneAndUpdate(
+      { patient: patientId, consentType },
+      {
+        patient: patientId,
+        consentType,
+        granted,
+        version: '1.0',
+        grantedAt: granted ? new Date() : null,
+        revokedAt: null,
+        ipAddress: req?.ip,
+        userAgent: req?.headers?.['user-agent'],
+        notes: granted ? 'Explicit consent at registration' : 'Not granted at registration',
+      },
+      { upsert: true, new: true }
+    );
+
+    if (granted) {
+      await logAudit({
+        actorRole: 'patient',
+        actorId: patientId.toString(),
+        action: 'consent.grant',
+        resourceType: 'consent',
+        resourceId: consentType,
+        patientId,
+        req,
+        metadata: { consentType, source: 'registration' },
+      });
+    }
+  }
+}
+
 async function seedDefaultConsents(patientId, req) {
   const defaults = ['treatment', 'telemedicine', 'data_sharing'];
   const now = new Date();
@@ -25,7 +90,7 @@ async function seedDefaultConsents(patientId, req) {
         revokedAt: null,
         ipAddress: req?.ip,
         userAgent: req?.headers?.['user-agent'],
-        notes: 'Default consent at registration',
+        notes: 'Legacy default consent (pre opt-in migration)',
       },
       { upsert: true, new: true }
     );
@@ -140,6 +205,9 @@ async function seedExistingPatientConsents() {
 module.exports = {
   CONSENT_TYPES,
   CONSENT_LABELS,
+  CONSENT_DESCRIPTIONS,
+  getConsentOptionsForRegistration,
+  applyRegistrationConsents,
   seedDefaultConsents,
   seedExistingPatientConsents,
   getPatientConsents,

@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  if (registerForm) {
+    loadConsentOptions();
+  }
+
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -81,6 +85,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const consents = collectRegistrationConsents();
+      if (!consents.treatment) {
+        showAlert(alertBox, 'Treatment consent is required to create an account.');
+        btn.disabled = false;
+        return;
+      }
+
       try {
         const data = await API.request('/api/auth/register', {
           method: 'POST',
@@ -91,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastName: registerForm.lastName.value.trim(),
             phone: registerForm.phone.value.trim(),
             dateOfBirth: registerForm.dateOfBirth.value || undefined,
+            consents,
           }),
         });
 
@@ -104,3 +116,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+async function loadConsentOptions() {
+  const container = document.getElementById('consentOptions');
+  if (!container) return;
+
+  try {
+    const data = await API.request('/api/compliance/consent-options');
+    container.innerHTML = (data.options || []).map((opt) => `
+      <label class="consent-option">
+        <input type="checkbox" name="consent_${opt.consentType}" value="${opt.consentType}"
+          ${opt.required ? 'required checked' : ''}>
+        <span>
+          <strong>${opt.label}${opt.required ? ' *' : ''}</strong>
+          <span class="text-small text-muted">${opt.description || ''}</span>
+        </span>
+      </label>
+    `).join('');
+  } catch {
+    container.innerHTML = `
+      <label class="consent-option">
+        <input type="checkbox" name="consent_treatment" value="treatment" required checked>
+        <span><strong>Treatment and care *</strong></span>
+      </label>
+    `;
+  }
+}
+
+function collectRegistrationConsents() {
+  const types = ['treatment', 'telemedicine', 'data_sharing', 'research'];
+  const consents = {};
+  types.forEach((type) => {
+    const input = document.querySelector(`input[name="consent_${type}"]`);
+    consents[type] = Boolean(input?.checked);
+  });
+  return consents;
+}

@@ -1,9 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { verifySocketToken } = require('../middleware/doctorAuth');
-const { saveChatMessage } = require('../services/telemedicineService');
+const { getJwtSecret } = require('../config/secrets');
+const {saveChatMessage,assertSocketConsultationAccess} = require('../services/telemedicineService');
 const Consultation = require('../models/Consultation');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
 
 function setupTelemedicineSockets(io) {
   io.use((socket, next) => {
@@ -14,7 +13,7 @@ function setupTelemedicineSockets(io) {
       if (socket.handshake.auth?.role === 'doctor') {
         socket.user = verifySocketToken(token);
       } else {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, getJwtSecret());
         socket.user = { role: 'patient', id: decoded.id, name: 'Patient' };
       }
       next();
@@ -32,10 +31,7 @@ function setupTelemedicineSockets(io) {
           return;
         }
 
-        if (socket.user.role === 'patient' && consultation.patient.toString() !== socket.user.id) {
-          socket.emit('error', { message: 'Access denied' });
-          return;
-        }
+        await assertSocketConsultationAccess(socket.user, consultation);
 
         socket.join(roomId);
         socket.consultationId = consultation._id;
@@ -46,16 +42,18 @@ function setupTelemedicineSockets(io) {
           name: socket.user.name,
         });
       } catch (err) {
-        socket.emit('error', { message: err.message });
+        socket.emit('error', { message: err.message || 'Access denied' });
       }
     });
 
     socket.on('chat-message', async ({ roomId, content }) => {
-      if (!content?.trim() || !roomId) return;
+      if (!content?.trim() || !roomId || !socket.rooms.has(roomId)) return;
 
       try {
         const consultation = await Consultation.findOne({ roomId });
         if (!consultation) return;
+
+        await assertSocketConsultationAccess(socket.user, consultation);
 
         const message = await saveChatMessage(
           consultation._id,
@@ -76,19 +74,44 @@ function setupTelemedicineSockets(io) {
       }
     });
 
-    socket.on('webrtc-offer', ({ roomId, offer }) => {
-      socket.to(roomId).emit('webrtc-offer', { offer, from: socket.user.role });
+    socket.on('webrtc-offer', async ({ roomId, offer }) => {
+      if (!roomId || !socket.rooms.has(roomId)) return;
+      try {
+        const consultation = await Consultation.findOne({ roomId });
+        if (!consultation) return;
+        await assertSocketConsultationAccess(socket.user, consultation);
+        socket.to(roomId).emit('webrtc-offer', { offer, from: socket.user.role });
+      } catch {
+        /* ignore */
+      }
     });
 
-    socket.on('webrtc-answer', ({ roomId, answer }) => {
-      socket.to(roomId).emit('webrtc-answer', { answer, from: socket.user.role });
+    socket.on('webrtc-answer', async ({ roomId, answer }) => {
+      if (!roomId || !socket.rooms.has(roomId)) return;
+      try {
+        const consultation = await Consultation.findOne({ roomId });
+        if (!consultation) return;
+        await assertSocketConsultationAccess(socket.user, consultation);
+        socket.to(roomId).emit('webrtc-answer', { answer, from: socket.user.role });
+      } catch {
+        /* ignore */
+      }
     });
 
-    socket.on('webrtc-ice-candidate', ({ roomId, candidate }) => {
-      socket.to(roomId).emit('webrtc-ice-candidate', { candidate, from: socket.user.role });
+    socket.on('webrtc-ice-candidate', async ({ roomId, candidate }) => {
+      if (!roomId || !socket.rooms.has(roomId)) return;
+      try {
+        const consultation = await Consultation.findOne({ roomId });
+        if (!consultation) return;
+        await assertSocketConsultationAccess(socket.user, consultation);
+        socket.to(roomId).emit('webrtc-ice-candidate', { candidate, from: socket.user.role });
+      } catch {
+        /* ignore */
+      }
     });
 
     socket.on('consultation-updated', ({ roomId, type, payload }) => {
+      if (!roomId || !socket.rooms.has(roomId)) return;
       io.to(roomId).emit('consultation-updated', { type, payload });
     });
 

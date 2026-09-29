@@ -13,6 +13,7 @@ const {
   addClinicalRecord,
   getMessages,
   getClinicalRecords,
+  assertDoctorCanAccessConsultation,
 } = require('../services/telemedicineService');
 const {
   getDoctorDashboardOverview,
@@ -22,6 +23,9 @@ const {
   completeAppointment,
 } = require('../services/doctorDashboardService');
 const { generatePatientSummary } = require('../services/patientSummaryService');
+const { authRateLimit } = require('../middleware/rateLimit');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 const Consultation = require('../models/Consultation');
 
 const router = express.Router();
@@ -53,7 +57,7 @@ router.get('/list', (_req, res) => {
   });
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authRateLimit, async (req, res) => {
   try {
     const { doctorId, password } = req.body;
     if (!doctorId || !password) {
@@ -83,7 +87,7 @@ router.post('/auth/login', async (req, res) => {
 
 router.use(doctorAuth);
 
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
     const data = await getDoctorDashboardOverview(req.doctorId);
     res.json(data);
@@ -92,7 +96,7 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-router.get('/appointments', async (req, res) => {
+router.get('/appointments', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
     const appointments = await getDoctorAppointments(req.doctorId, {
       date: req.query.date,
@@ -104,7 +108,7 @@ router.get('/appointments', async (req, res) => {
   }
 });
 
-router.patch('/appointments/:id/complete', async (req, res) => {
+router.patch('/appointments/:id/complete', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
     const appointment = await completeAppointment(req.doctorId, req.params.id);
     res.json({ message: 'Appointment marked complete', appointment });
@@ -113,7 +117,7 @@ router.patch('/appointments/:id/complete', async (req, res) => {
   }
 });
 
-router.get('/patients/:patientId/history', async (req, res) => {
+router.get('/patients/:patientId/history', requirePermission(PERMISSIONS.PATIENT_RECORDS_READ), async (req, res) => {
   try {
     const history = await getPatientHistory(req.doctorId, req.params.patientId, req);
     res.json(history);
@@ -123,7 +127,7 @@ router.get('/patients/:patientId/history', async (req, res) => {
   }
 });
 
-router.get('/patients/:patientId/summary', async (req, res) => {
+router.get('/patients/:patientId/summary', requirePermission(PERMISSIONS.PATIENT_RECORDS_READ), async (req, res) => {
   try {
     await getPatientHistory(req.doctorId, req.params.patientId, req);
     const summary = await generatePatientSummary(req.params.patientId);
@@ -134,7 +138,7 @@ router.get('/patients/:patientId/summary', async (req, res) => {
   }
 });
 
-router.post('/patients/:patientId/notes', async (req, res) => {
+router.post('/patients/:patientId/notes', requirePermission(PERMISSIONS.PATIENT_RECORDS_WRITE), async (req, res) => {
   try {
     const { content, title, consultationId } = req.body;
     const note = await addDoctorNote(req.doctorId, req.params.patientId, {
@@ -148,7 +152,7 @@ router.post('/patients/:patientId/notes', async (req, res) => {
   }
 });
 
-router.get('/consultations', async (req, res) => {
+router.get('/consultations', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
     const consultations = await getWaitingConsultations(req.doctorId);
     res.json({ consultations });
@@ -157,7 +161,7 @@ router.get('/consultations', async (req, res) => {
   }
 });
 
-router.patch('/consultations/:id/join', async (req, res) => {
+router.patch('/consultations/:id/join', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
     const consultation = await doctorJoinConsultation(req.doctorId, req.params.id, req);
     const populated = await Consultation.findById(consultation._id)
@@ -177,23 +181,23 @@ router.patch('/consultations/:id/join', async (req, res) => {
   }
 });
 
-router.get('/consultations/:id', async (req, res) => {
+router.get('/consultations/:id', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
-    const consultation = await Consultation.findById(req.params.id)
+    const { consultation } = await assertDoctorCanAccessConsultation(req.doctorId, req.params.id);
+    const populated = await Consultation.findById(consultation._id)
       .populate('patient', 'firstName lastName email');
-    if (!consultation) return res.status(404).json({ message: 'Consultation not found' });
 
     const [messages, records] = await Promise.all([
       getMessages(consultation._id),
       getClinicalRecords(consultation._id),
     ]);
-    res.json({ consultation, messages, records });
+    res.json({ consultation: populated, messages, records });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.post('/consultations/:id/prescription', async (req, res) => {
+router.post('/consultations/:id/prescription', requirePermission(PERMISSIONS.PRESCRIPTIONS_ISSUE), async (req, res) => {
   try {
     const { medication, dosage, frequency, duration, instructions } = req.body;
     if (!medication) return res.status(400).json({ message: 'Medication name is required' });
@@ -209,7 +213,7 @@ router.post('/consultations/:id/prescription', async (req, res) => {
   }
 });
 
-router.post('/consultations/:id/test', async (req, res) => {
+router.post('/consultations/:id/test', requirePermission(PERMISSIONS.PATIENT_RECORDS_WRITE), async (req, res) => {
   try {
     const { testName, urgency, instructions } = req.body;
     if (!testName) return res.status(400).json({ message: 'Test name is required' });
@@ -225,7 +229,7 @@ router.post('/consultations/:id/test', async (req, res) => {
   }
 });
 
-router.post('/consultations/:id/referral', async (req, res) => {
+router.post('/consultations/:id/referral', requirePermission(PERMISSIONS.PATIENT_RECORDS_WRITE), async (req, res) => {
   try {
     const { specialty, facility, reason, urgency } = req.body;
     if (!specialty) return res.status(400).json({ message: 'Specialty is required' });
@@ -241,10 +245,9 @@ router.post('/consultations/:id/referral', async (req, res) => {
   }
 });
 
-router.post('/consultations/:id/note', async (req, res) => {
+router.post('/consultations/:id/note', requirePermission(PERMISSIONS.PATIENT_RECORDS_WRITE), async (req, res) => {
   try {
-    const consultation = await Consultation.findById(req.params.id);
-    if (!consultation) return res.status(404).json({ message: 'Consultation not found' });
+    const { consultation } = await assertDoctorCanAccessConsultation(req.doctorId, req.params.id, { write: true });
 
     const note = await addDoctorNote(req.doctorId, consultation.patient, {
       content: req.body.content,
@@ -257,7 +260,7 @@ router.post('/consultations/:id/note', async (req, res) => {
   }
 });
 
-router.post('/consultations/:id/file', upload.single('file'), async (req, res) => {
+router.post('/consultations/:id/file', requirePermission(PERMISSIONS.PATIENT_RECORDS_WRITE), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'File is required' });
 
@@ -275,10 +278,12 @@ router.post('/consultations/:id/file', upload.single('file'), async (req, res) =
   }
 });
 
-router.patch('/consultations/:id/end', async (req, res) => {
+router.patch('/consultations/:id/end', requirePermission(PERMISSIONS.CONSULTATIONS_CONDUCT), async (req, res) => {
   try {
-    const consultation = await Consultation.findById(req.params.id);
-    if (!consultation) return res.status(404).json({ message: 'Consultation not found' });
+    const { consultation } = await assertDoctorCanAccessConsultation(req.doctorId, req.params.id, { write: true });
+    if (consultation.status === 'ended') {
+      return res.json({ message: 'Consultation already ended', consultation });
+    }
 
     consultation.status = 'ended';
     consultation.endedAt = new Date();

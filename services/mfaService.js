@@ -3,20 +3,20 @@ const { generateSecret, verify, generateURI } = require('otplib');
 const Patient = require('../models/Patient');
 const DoctorAccount = require('../models/DoctorAccount');
 const HospitalAdmin = require('../models/HospitalAdmin');
+const PharmacistAccount = require('../models/PharmacistAccount');
 const { logAudit } = require('./auditService');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
+const { getJwtSecret } = require('../config/secrets');
 
 function signMfaPendingToken({ role, id, name, extra = {} }) {
   return jwt.sign(
     { purpose: 'mfa_pending', role, id, name, ...extra },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '5m' }
   );
 }
 
 function verifyMfaPendingToken(token) {
-  const decoded = jwt.verify(token, JWT_SECRET);
+  const decoded = jwt.verify(token, getJwtSecret());
   if (decoded.purpose !== 'mfa_pending') throw new Error('Invalid MFA session');
   return decoded;
 }
@@ -30,6 +30,9 @@ async function getAccountForRole(role, id) {
   }
   if (role === 'admin') {
     return HospitalAdmin.findById(id).select('+mfaSecret');
+  }
+  if (role === 'pharmacist') {
+    return PharmacistAccount.findOne({ pharmacyId: id, active: true }).select('+mfaSecret');
   }
   throw new Error('Invalid role');
 }

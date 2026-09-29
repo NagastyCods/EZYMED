@@ -1,5 +1,10 @@
 const Appointment = require('../models/Appointment');
+const Patient = require('../models/Patient');
 const { DOCTORS, DEPARTMENTS, findDoctorByName, findDoctorById } = require('../config/doctors');
+const {
+  sendAppointmentConfirmation,
+  sendAppointmentReminder,
+} = require('./notificationService');
 
 const SLOT_MINUTES = 30;
 const BOOKING_DAYS_AHEAD = 14;
@@ -181,6 +186,13 @@ async function bookAppointment(patientId, data) {
     durationMinutes: SLOT_MINUTES,
   });
 
+  try {
+    const patient = await Patient.findById(patientId);
+    if (patient) await sendAppointmentConfirmation(patient, appointment);
+  } catch {
+    /* booking succeeds even if notification fails */
+  }
+
   return appointment;
 }
 
@@ -225,6 +237,7 @@ async function cancelAppointment(patientId, appointmentId) {
 
 async function getPatientReminders(patientId) {
   const now = new Date();
+  const patient = await Patient.findById(patientId);
   const upcoming = await Appointment.find({
     patient: patientId,
     status: 'scheduled',
@@ -247,6 +260,9 @@ async function getPatientReminders(patientId) {
       });
       apt.reminder24hSent = true;
       await apt.save();
+      if (patient) {
+        try { await sendAppointmentReminder(patient, apt, '24h'); } catch { /* ignore */ }
+      }
     } else if (hoursUntil <= 1 && !apt.reminder1hSent) {
       reminders.push({
         type: '1h',
@@ -257,6 +273,9 @@ async function getPatientReminders(patientId) {
       });
       apt.reminder1hSent = true;
       await apt.save();
+      if (patient) {
+        try { await sendAppointmentReminder(patient, apt, '1h'); } catch { /* ignore */ }
+      }
     }
   }
 

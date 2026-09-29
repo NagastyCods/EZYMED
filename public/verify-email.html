@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Verify email — EZYMED</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <h1>Verify email</h1>
+      <p class="subtitle">Confirming your email address…</p>
+      <div id="alertBox"></div>
+      <p class="auth-footer"><a href="/login.html">Continue to sign in</a></p>
+    </div>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/account-recovery.js"></script>
+  <script>
+    verifyEmailFromQuery('alertBox');
+  </script>
+</body>
+</html>

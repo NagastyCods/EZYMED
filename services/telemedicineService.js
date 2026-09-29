@@ -7,6 +7,87 @@ const { encrypt, decrypt } = require('./encryptionService');
 const { requireActiveConsent } = require('./consentService');
 const { logAudit } = require('./auditService');
 
+async function getConsultationOrThrow(consultationId) {
+  const consultation = await Consultation.findById(consultationId);
+  if (!consultation) throw new Error('Consultation not found.');
+  return consultation;
+}
+
+async function assertDoctorCanAccessConsultation(doctorId, consultationId, { write = false } = {}) {
+  const doctor = findDoctorById(doctorId);
+  if (!doctor) throw new Error('Doctor not found.');
+
+  const consultation = await getConsultationOrThrow(consultationId);
+
+  if (consultation.doctorId === doctor.id) {
+    return { doctor, consultation };
+  }
+
+  if (write) {
+    throw new Error('You do not have access to this consultation');
+  }
+
+  if (
+    consultation.status === 'waiting' &&
+    consultation.department === doctor.department &&
+    (!consultation.doctorId || consultation.doctorId === doctor.id)
+  ) {
+    return { doctor, consultation };
+  }
+
+  throw new Error('You do not have access to this consultation');
+}
+
+async function assertDoctorCanJoinConsultation(doctorId, consultationId) {
+  const doctor = findDoctorById(doctorId);
+  if (!doctor) throw new Error('Doctor not found.');
+
+  const consultation = await getConsultationOrThrow(consultationId);
+  if (consultation.status === 'ended') throw new Error('Consultation has already ended.');
+
+  if (consultation.doctorId && consultation.doctorId !== doctor.id) {
+    throw new Error('This consultation is assigned to another doctor');
+  }
+
+  if (consultation.doctorId === doctor.id) {
+    return { doctor, consultation };
+  }
+
+  if (consultation.status === 'waiting' && consultation.department === doctor.department) {
+    return { doctor, consultation };
+  }
+
+  throw new Error('You cannot join this consultation');
+}
+
+async function assertSocketConsultationAccess(socketUser, consultation) {
+  if (socketUser.role === 'patient') {
+    if (consultation.patient.toString() !== socketUser.id) {
+      throw new Error('Access denied');
+    }
+    return;
+  }
+
+  if (socketUser.role === 'doctor') {
+    const doctor = findDoctorById(socketUser.id);
+    if (!doctor) throw new Error('Access denied');
+
+    if (consultation.doctorId === doctor.id) return;
+
+    if (
+      consultation.status === 'waiting' &&
+      consultation.department === doctor.department &&
+      (!consultation.doctorId || consultation.doctorId === doctor.id)
+    ) {
+      return;
+    }
+
+    throw new Error('Access denied');
+  }
+
+  throw new Error('Access denied');
+}
+
 async function getActiveConsultation(patientId) {
   return Consultation.findOne({
     patient: patientId,
@@ -120,12 +201,7 @@ async function getPatientRecords(patientId) {
 }
 
 async function doctorJoinConsultation(doctorId, consultationId, req) {
-  const doctor = findDoctorById(doctorId);
-  if (!doctor) throw new Error('Doctor not found.');
-
-  const consultation = await Consultation.findById(consultationId);
-  if (!consultation) throw new Error('Consultation not found.');
-  if (consultation.status === 'ended') throw new Error('Consultation has already ended.');
+  const { doctor, consultation } = await assertDoctorCanJoinConsultation(doctorId, consultationId);
 
   await requireActiveConsent(consultation.patient, 'telemedicine');
 
@@ -178,11 +254,7 @@ async function getWaitingConsultations(doctorId) {
 }
 
 async function addClinicalRecord(doctorId, consultationId, payload, req) {
-  const doctor = findDoctorById(doctorId);
-  if (!doctor) throw new Error('Doctor not found.');
-
-  const consultation = await Consultation.findById(consultationId);
-  if (!consultation) throw new Error('Consultation not found.');
+  const { doctor, consultation } = await assertDoctorCanAccessConsultation(doctorId, consultationId, { write: true });
 
   const record = await ClinicalRecord.create({
     consultation: consultation._id,
@@ -246,4 +318,7 @@ module.exports = {
   getWaitingConsultations,
   addClinicalRecord,
   saveChatMessage,
+  assertDoctorCanAccessConsultation,
+  assertDoctorCanJoinConsultation,
+  assertSocketConsultationAccess,
 };

@@ -2,13 +2,12 @@ const jwt = require('jsonwebtoken');
 const HospitalAdmin = require('../models/HospitalAdmin');
 const { accountRequiresMfa, signMfaPendingToken } = require('../services/mfaService');
 const { logAudit } = require('../services/auditService');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production';
+const { getJwtSecret } = require('../config/secrets');
 
 const signAdminToken = (admin) =>
   jwt.sign(
     { id: admin.id, role: 'admin', email: admin.email, name: admin.name },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '12h' }
   );
 
@@ -78,7 +77,7 @@ const adminAuth = (req, res, next) => {
       return res.status(401).json({ message: 'Administrator authentication required' });
     }
 
-    const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
+    const decoded = jwt.verify(header.split(' ')[1], getJwtSecret());
     if (decoded.role !== 'admin') {
       return res.status(403).json({ message: 'Administrator access only' });
     }

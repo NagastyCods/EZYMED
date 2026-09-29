@@ -4,7 +4,12 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
+const mongoose = require('mongoose');
+const { validateSecretsOnStartup } = require('./config/secrets');
+const { getAllowedOrigins } = require('./config/app');
+const { createApp } = require('./app');
 const connectDB = require('./config/db');
+const logger = require('./services/logger');
 const { seedStaffAccounts } = require('./services/staffSeedService');
 const { backfillPrescriptions } = require('./services/pharmacyService');
 const { seedExistingPatientConsents } = require('./services/consentService');
@@ -24,50 +29,52 @@ const complianceRoutes = require('./routes/compliance');
 const securityHeaders = require('./middleware/securityHeaders');
 const { setupTelemedicineSockets } = require('./services/socketHandlers');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-});
+const app = createApp();
+let server;
+let io;
 
-const PORT = process.env.PORT || 3000;
+function startServer() {
+  validateSecretsOnStartup();
 
-app.set('trust proxy', 1);
-app.use(securityHeaders);
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads/consultations', express.static(path.join(__dirname, 'uploads', 'consultations')));
-
-app.use('/api/auth', authRoutes);
-app.use('/api/patient', patientRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/symptom-checker', symptomCheckerRoutes);
-app.use('/api/queue', queueRoutes);
-app.use('/api/consultations', consultationRoutes);
-app.use('/api/doctor', doctorRoutes);
-app.use('/api/hospital', hospitalRoutes);
-app.use('/api/pharmacy', pharmacyRoutes);
-app.use('/api/satisfaction', satisfactionRoutes);
-app.use('/api/security', securityRoutes);
-app.use('/api/compliance', complianceRoutes);
-
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'EZYMED Healthcare Platform' });
-});
-
-setupTelemedicineSockets(io);
-app.set('io', io);
-
-connectDB()
-  .then(() => seedStaffAccounts())
-  .then(() => seedExistingPatientConsents())
-  .then(() => backfillPrescriptions())
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`EZYMED server running at http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB:', err.message);
-    process.exit(1);
+  const PORT = process.env.PORT || 3000;
+  server = http.createServer(app);
+  io = new Server(server, {
+    cors: { origin: getAllowedOrigins(), methods: ['GET', 'POST'] },
   });
+
+  setupTelemedicineSockets(io);
+  app.set('io', io);
+
+  function shutdown(signal) {
+    logger.info({ signal }, 'Shutting down');
+    server.close(() => {
+      mongoose.connection.close(false).then(() => {
+        logger.info('Shutdown complete');
+        process.exit(0);
+      }).catch(() => process.exit(1));
+    });
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  connectDB()
+    .then(() => seedStaffAccounts())
+    .then(() => seedExistingPatientConsents())
+    .then(() => backfillPrescriptions())
+    .then(() => {
+      server.listen(PORT, () => {
+        logger.info({ port: PORT, env: process.env.NODE_ENV }, 'EZYMED server started');
+      });
+    })
+    .catch((err) => {
+      logger.error({ err: err.message }, 'Failed to start server');
+      process.exit(1);
+    });
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, server, startServer };

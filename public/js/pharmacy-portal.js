@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   else showLogin();
 
   document.getElementById('pharmacyLoginForm').addEventListener('submit', handleLogin);
+  document.getElementById('pharmacyMfaForm')?.addEventListener('submit', handlePharmacyMfaLogin);
   document.getElementById('pharmacyLogoutBtn').addEventListener('click', () => {
     PharmacyAPI.clearToken();
     showLogin();
@@ -49,8 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showLogin() {
   document.getElementById('pharmacyLogin').hidden = false;
+  document.getElementById('pharmacyLoginForm').hidden = false;
   document.getElementById('pharmacyDashboard').hidden = true;
   document.getElementById('pharmacyNav').hidden = true;
+  document.getElementById('pharmacyLoginAlert').innerHTML = '';
+  document.getElementById('pharmacyLoginForm').reset();
+  document.getElementById('pharmacyMfaForm')?.reset();
+  document.getElementById('pharmacyMfaForm').hidden = true;
+  sessionStorage.removeItem('ezymed_pharmacy_mfa_token');
 }
 
 function showDashboard() {
@@ -82,6 +89,35 @@ async function handleLogin(e) {
       method: 'POST',
       body: JSON.stringify({ pharmacyId: form.pharmacyId.value, password: form.password.value }),
     });
+
+    if (data.requiresMfa) {
+      sessionStorage.setItem('ezymed_pharmacy_mfa_token', data.mfaToken);
+      document.getElementById('pharmacyLoginForm').hidden = true;
+      document.getElementById('pharmacyMfaForm').hidden = false;
+      alertBox.innerHTML = '<div class="alert alert-success">Enter your authenticator code.</div>';
+      return;
+    }
+
+    PharmacyAPI.setToken(data.token);
+    PharmacyAPI.setPharmacy(data.pharmacy);
+    showDashboard();
+  } catch (err) {
+    alertBox.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+async function handlePharmacyMfaLogin(e) {
+  e.preventDefault();
+  const alertBox = document.getElementById('pharmacyLoginAlert');
+  const form = e.target;
+  const mfaToken = sessionStorage.getItem('ezymed_pharmacy_mfa_token');
+
+  try {
+    const data = await PharmacyAPI.request('/api/security/mfa/verify-login', {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, code: form.code.value.trim() }),
+    });
+    sessionStorage.removeItem('ezymed_pharmacy_mfa_token');
     PharmacyAPI.setToken(data.token);
     PharmacyAPI.setPharmacy(data.pharmacy);
     showDashboard();

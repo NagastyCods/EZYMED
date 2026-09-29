@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Patient = require('../models/Patient');
+const { getJwtSecret } = require('../config/secrets');
 
 const auth = async (req, res, next) => {
   try {
@@ -9,7 +10,7 @@ const auth = async (req, res, next) => {
     }
 
     const token = header.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'ezymed-dev-secret-change-in-production');
+    const decoded = jwt.verify(token, getJwtSecret());
 
     const patient = await Patient.findById(decoded.id);
     if (!patient) {

@@ -1,5 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const { requirePermission } = require('../middleware/rbac');
+const { PERMISSIONS } = require('../config/roles');
 const {
   requestConsultation,
   getActiveConsultation,
@@ -14,7 +16,7 @@ const router = express.Router();
 
 router.use(auth);
 
-router.get('/active', async (req, res) => {
+router.get('/active', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     const consultation = await getActiveConsultation(req.patientId);
     res.json({ consultation, hasActive: Boolean(consultation) });
@@ -23,7 +25,7 @@ router.get('/active', async (req, res) => {
   }
 });
 
-router.post('/request', async (req, res) => {
+router.post('/request', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     const { mode, doctorId, department, reason, appointmentId } = req.body;
     if (!mode || !['video', 'voice', 'chat'].includes(mode)) {
@@ -41,7 +43,7 @@ router.post('/request', async (req, res) => {
   }
 });
 
-router.get('/records', async (req, res) => {
+router.get('/records', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     const records = await getPatientRecords(req.patientId);
     res.json({ records });
@@ -50,7 +52,7 @@ router.get('/records', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     const consultation = await getConsultationForPatient(req.patientId, req.params.id);
     const [messages, records] = await Promise.all([
@@ -63,7 +65,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.get('/:id/messages', async (req, res) => {
+router.get('/:id/messages', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     await getConsultationForPatient(req.patientId, req.params.id);
     const messages = await getMessages(req.params.id);
@@ -73,7 +75,7 @@ router.get('/:id/messages', async (req, res) => {
   }
 });
 
-router.patch('/:id/end', async (req, res) => {
+router.patch('/:id/end', requirePermission(PERMISSIONS.CONSULTATIONS_REQUEST), async (req, res) => {
   try {
     const consultation = await endConsultation(req.patientId, req.params.id, req);
     res.json({ message: 'Consultation ended', consultation });

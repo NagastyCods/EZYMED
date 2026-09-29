@@ -44,6 +44,30 @@ const API = {
     }
     return true;
   },
+
+  async downloadClinicalFile(recordId, filename) {
+    const token = this.getToken();
+    if (!token) throw new Error('Authentication required');
+
+    const res = await fetch(`${this.base}/api/files/clinical/${recordId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Download failed');
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'clinical-file';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 function showAlert(container, message, type = 'error') {

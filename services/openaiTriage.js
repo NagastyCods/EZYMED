@@ -21,7 +21,7 @@ Your role is to support patient triage — you do NOT diagnose disease.
 
 Rules you must follow:
 1. Never state that the patient has a confirmed diagnosis. Use language like "possible", "may suggest", or "worth discussing with a doctor".
-2. Identify 1–4 possible conditions the patient should discuss with a clinician.
+2. Identify 1 - 4 possible conditions the patient should discuss with a clinician.
 3. Estimate urgency: routine, moderate, urgent, or emergency.
 4. Suggest the most appropriate hospital department (e.g. General Medicine, Pediatrics, Cardiology, Emergency Medicine).
 5. Recommend one action: stay_home, book_consultation, or seek_emergency.
@@ -164,7 +164,7 @@ function validateAndNormalize(raw) {
 
 async function analyzeSymptomsWithOpenAI(responses, patientContext = {}) {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const model = process.env.OPENAI_MODEL;
 
   const userPrompt = JSON.stringify({
     task: 'Perform triage based on the patient symptom questionnaire responses.',

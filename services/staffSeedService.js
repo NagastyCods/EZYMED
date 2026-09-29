@@ -3,12 +3,13 @@ const { PHARMACIES } = require('../config/pharmacies');
 const DoctorAccount = require('../models/DoctorAccount');
 const HospitalAdmin = require('../models/HospitalAdmin');
 const PharmacistAccount = require('../models/PharmacistAccount');
+const logger = require('./logger');
 
 async function seedStaffAccounts() {
-  const defaultDoctorPassword = process.env.DOCTOR_DEFAULT_PASSWORD || 'Doctor@123';
-  const defaultPharmacyPassword = process.env.PHARMACY_DEFAULT_PASSWORD || 'Pharmacy@123';
-  const adminEmail = (process.env.HOSPITAL_ADMIN_EMAIL || 'admin@ezymed.com').toLowerCase();
-  const adminPassword = process.env.HOSPITAL_ADMIN_PASSWORD || 'Admin@123';
+  const defaultDoctorPassword = process.env.DOCTOR_DEFAULT_PASSWORD ;
+  const defaultPharmacyPassword = process.env.PHARMACY_DEFAULT_PASSWORD;
+  const adminEmail = process.env.HOSPITAL_ADMIN_EMAIL
+  const adminPassword = process.env.HOSPITAL_ADMIN_PASSWORD;
 
   let seeded = 0;
 
@@ -45,7 +46,7 @@ async function seedStaffAccounts() {
   }
 
   if (seeded > 0) {
-    console.log(`Staff accounts seeded (${seeded} new account${seeded === 1 ? '' : 's'})`);
+    logger.info({ seeded }, 'Staff accounts seeded');
   }
 }
 

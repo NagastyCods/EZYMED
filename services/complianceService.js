@@ -3,8 +3,15 @@ const Appointment = require('../models/Appointment');
 const SymptomAssessment = require('../models/SymptomAssessment');
 const ConsentRecord = require('../models/ConsentRecord');
 const AuditLog = require('../models/AuditLog');
+const Consultation = require('../models/Consultation');
+const ConsultationMessage = require('../models/ConsultationMessage');
+const ClinicalRecord = require('../models/ClinicalRecord');
+const DoctorNote = require('../models/DoctorNote');
+const PharmacyOrder = require('../models/PharmacyOrder');
+const QueueEntry = require('../models/QueueEntry');
 const { decrypt } = require('./encryptionService');
 const { logFromRequest } = require('./auditService');
+const { buildPatientExportPdf } = require('./pdfExportService');
 
 const PRIVACY_NOTICE = {
   version: '1.0',
@@ -33,16 +40,72 @@ const PRIVACY_NOTICE = {
   },
 };
 
+const OPENAI_PHI_POLICY = {
+  summary: 'Patient summaries may use OpenAI only when OPENAI_PHI_ENABLED=true and a valid Business Associate Agreement is in place.',
+  requirements: [
+    'Set OPENAI_PHI_ENABLED=true only after legal/BAA review',
+    'Use a dedicated OpenAI API key with usage restrictions',
+    'Doctor notes are decrypted locally before any AI request',
+    'Without explicit enablement, summaries use on-platform rules only',
+  ],
+};
+
+function mapConsultation(c) {
+  return {
+    id: c._id,
+    mode: c.mode,
+    status: c.status,
+    department: c.department,
+    doctorName: c.doctorName,
+    reason: c.reason,
+    createdAt: c.createdAt,
+    startedAt: c.startedAt,
+    endedAt: c.endedAt,
+  };
+}
+
+function mapClinicalRecord(r) {
+  return {
+    id: r._id,
+    type: r.type,
+    title: r.title,
+    details: r.details,
+    doctorName: r.doctorName,
+    fileName: r.fileName,
+    createdAt: r.createdAt,
+  };
+}
+
 async function exportPatientData(patientId, req) {
   const patient = await Patient.findById(patientId);
   if (!patient) throw new Error('Patient not found');
 
-  const [appointments, assessments, consents, accessLogs] = await Promise.all([
+  const [
+    appointments,
+    assessments,
+    consents,
+    accessLogs,
+    consultations,
+    clinicalRecords,
+    doctorNotes,
+    pharmacyOrders,
+    queueEntries,
+  ] = await Promise.all([
     Appointment.find({ patient: patientId }).sort({ scheduledAt: -1 }),
     SymptomAssessment.find({ patient: patientId }).sort({ createdAt: -1 }),
     ConsentRecord.find({ patient: patientId }),
     AuditLog.find({ patientId }).sort({ createdAt: -1 }).limit(200),
+    Consultation.find({ patient: patientId }).sort({ createdAt: -1 }),
+    ClinicalRecord.find({ patient: patientId }).sort({ createdAt: -1 }),
+    DoctorNote.find({ patient: patientId }).sort({ createdAt: -1 }),
+    PharmacyOrder.find({ patient: patientId }).sort({ createdAt: -1 }),
+    QueueEntry.find({ patient: patientId }).sort({ createdAt: -1 }).limit(50),
   ]);
+
+  const consultationIds = consultations.map((c) => c._id);
+  const consultationMessages = consultationIds.length
+    ? await ConsultationMessage.find({ consultation: { $in: consultationIds } }).sort({ createdAt: 1 })
+    : [];
 
   await logFromRequest(req, {
     action: 'data.export',
@@ -51,13 +114,46 @@ async function exportPatientData(patientId, req) {
     patientId,
   });
 
-  return {
+  const payload = {
     exportedAt: new Date().toISOString(),
     privacyNoticeVersion: PRIVACY_NOTICE.version,
     patient: patient.toPublicJSON(),
     appointments,
     symptomAssessments: assessments,
     consents,
+    consultations: consultations.map(mapConsultation),
+    consultationMessages: consultationMessages.map((m) => ({
+      consultation: m.consultation,
+      senderType: m.senderType,
+      senderName: m.senderName,
+      content: decrypt(m.content),
+      createdAt: m.createdAt,
+    })),
+    clinicalRecords: clinicalRecords.map(mapClinicalRecord),
+    doctorNotes: doctorNotes.map((n) => ({
+      title: n.title,
+      content: decrypt(n.content),
+      doctorId: n.doctorId,
+      doctorName: n.doctorName,
+      createdAt: n.createdAt,
+    })),
+    pharmacyOrders: pharmacyOrders.map((o) => ({
+      medication: o.medication,
+      dosage: o.dosage,
+      frequency: o.frequency,
+      status: o.status,
+      pharmacyId: o.pharmacyId,
+      notificationMessage: o.notificationMessage,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt,
+    })),
+    queueHistory: queueEntries.map((q) => ({
+      department: q.department,
+      status: q.status,
+      urgency: q.urgency,
+      queueNumber: q.queueNumber,
+      createdAt: q.createdAt,
+    })),
     accessAuditTrail: accessLogs.map((l) => ({
       action: l.action,
       actorRole: l.actorRole,
@@ -66,6 +162,8 @@ async function exportPatientData(patientId, req) {
       createdAt: l.createdAt,
     })),
   };
+
+  return buildPatientExportPdf(payload);
 }
 
 function getPrivacyNotice() {
@@ -82,8 +180,9 @@ function getRegulatoryInfo() {
       'AES-256-GCM encryption at rest for clinical messages and notes',
       'TLS required in production (HTTPS)',
       'Comprehensive audit logging',
-      'Patient consent management',
+      'Patient consent management (explicit opt-in at registration)',
     ],
+    openAiPhiPolicy: OPENAI_PHI_POLICY,
     dataRetention: 'Records retained per clinical and legal requirements. Contact privacy@ezymed.com for deletion requests.',
   };
 }
@@ -93,4 +192,5 @@ module.exports = {
   getPrivacyNotice,
   getRegulatoryInfo,
   PRIVACY_NOTICE,
+  OPENAI_PHI_POLICY,
 };

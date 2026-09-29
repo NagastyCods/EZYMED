@@ -261,6 +261,31 @@ body.nav-open { overflow: hidden; }
 .auth-card .subtitle { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
 .auth-footer { text-align: center; margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem; }
 
+.consent-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.consent-fieldset legend {
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0 0.25rem;
+}
+
+.consent-option {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+
+.consent-option input { margin-top: 0.2rem; flex-shrink: 0; }
+
+.consent-option span { display: flex; flex-direction: column; gap: 0.15rem; }
+
 .form-group { margin-bottom: 1rem; }
 
 .form-group label {
