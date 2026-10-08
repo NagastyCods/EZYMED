@@ -117,29 +117,57 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-async function loadConsentOptions() {
+const DEFAULT_CONSENT_OPTIONS = [
+  {
+    consentType: 'treatment',
+    label: 'Treatment and care',
+    description: 'Required to use EZYMED for appointments, symptom checks, and clinical services.',
+    required: true,
+  },
+  {
+    consentType: 'data_sharing',
+    label: 'Share records with assigned clinicians',
+    description: 'Allow assigned doctors to view your medical records during care.',
+    required: false,
+  },
+  {
+    consentType: 'telemedicine',
+    label: 'Telemedicine (video, voice, chat)',
+    description: 'Enable video, voice, and chat consultations with clinicians.',
+    required: false,
+  },
+  {
+    consentType: 'research',
+    label: 'Anonymized data for quality improvement',
+    description: 'Optional use of anonymized data for service quality improvement.',
+    required: false,
+  },
+];
+
+function renderConsentOptions(options) {
   const container = document.getElementById('consentOptions');
   if (!container) return;
 
+  container.innerHTML = (options || []).map((opt) => `
+    <label class="consent-option">
+      <input type="checkbox" name="consent_${opt.consentType}" value="${opt.consentType}"
+        ${opt.required ? 'required checked' : ''}>
+      <span>
+        <strong>${opt.label}${opt.required ? ' *' : ''}</strong>
+        <span class="text-small text-muted">${opt.description || ''}</span>
+      </span>
+    </label>
+  `).join('');
+}
+
+async function loadConsentOptions() {
+  renderConsentOptions(DEFAULT_CONSENT_OPTIONS);
+
   try {
     const data = await API.request('/api/compliance/consent-options');
-    container.innerHTML = (data.options || []).map((opt) => `
-      <label class="consent-option">
-        <input type="checkbox" name="consent_${opt.consentType}" value="${opt.consentType}"
-          ${opt.required ? 'required checked' : ''}>
-        <span>
-          <strong>${opt.label}${opt.required ? ' *' : ''}</strong>
-          <span class="text-small text-muted">${opt.description || ''}</span>
-        </span>
-      </label>
-    `).join('');
+    if (data.options?.length) renderConsentOptions(data.options);
   } catch {
-    container.innerHTML = `
-      <label class="consent-option">
-        <input type="checkbox" name="consent_treatment" value="treatment" required checked>
-        <span><strong>Treatment and care *</strong></span>
-      </label>
-    `;
+    /* keep the full local list when the consent endpoint is unavailable */
   }
 }
 

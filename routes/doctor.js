@@ -31,10 +31,11 @@ const Consultation = require('../models/Consultation');
 const router = express.Router();
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'consultations');
-fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
+  destination: (_req, _file, cb) => {
+    fs.mkdir(uploadDir, { recursive: true }, (err) => cb(err, uploadDir));
+  },
   filename: (_req, file, cb) => {
     const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     cb(null, `${Date.now()}-${safe}`);

@@ -1,12 +1,33 @@
 const mongoose = require('mongoose');
 const logger = require('../services/logger');
 
-const connectDB = async () => {
+let connectionPromise;
+
+function connectDB() {
+  if (mongoose.connection.readyState === 1) {
+    return Promise.resolve(mongoose.connection);
+  }
+
+  if (connectionPromise) return connectionPromise;
+
   const uri = process.env.MONGODB_URI;
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5000,
+  if (!uri) {
+    const err = new Error('MONGODB_URI is not configured');
+    err.code = 'DB_NOT_CONFIGURED';
+    return Promise.reject(err);
+  }
+
+  connectionPromise = mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 8000,
+  }).then(() => {
+    logger.info('MongoDB connected');
+    return mongoose.connection;
+  }).catch((err) => {
+    connectionPromise = null;
+    throw err;
   });
-  logger.info('MongoDB connected');
-};
+
+  return connectionPromise;
+}
 
 module.exports = connectDB;
