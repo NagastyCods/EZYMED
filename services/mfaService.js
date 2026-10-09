@@ -1,11 +1,17 @@
 const jwt = require('jsonwebtoken');
-const { generateSecret, verify, generateURI } = require('otplib');
 const Patient = require('../models/Patient');
 const DoctorAccount = require('../models/DoctorAccount');
 const HospitalAdmin = require('../models/HospitalAdmin');
 const PharmacistAccount = require('../models/PharmacistAccount');
 const { logAudit } = require('./auditService');
 const { getJwtSecret } = require('../config/secrets');
+
+let otpPromise;
+
+function loadOtp() {
+  if (!otpPromise) otpPromise = import('otplib');
+  return otpPromise;
+}
 
 function signMfaPendingToken({ role, id, name, extra = {} }) {
   return jwt.sign(
@@ -41,6 +47,7 @@ async function startMfaSetup(role, id, label) {
   const account = await getAccountForRole(role, id);
   if (!account) throw new Error('Account not found');
 
+  const { generateSecret, generateURI } = await loadOtp();
   const secret = generateSecret();
   account.mfaSecret = secret;
   account.mfaEnabled = false;
@@ -59,6 +66,7 @@ async function confirmMfaSetup(role, id, code, req) {
   const account = await getAccountForRole(role, id);
   if (!account?.mfaSecret) throw new Error('MFA setup not started');
 
+  const { verify } = await loadOtp();
   const result = await verify({ token: code, secret: account.mfaSecret });
   if (!result.valid) throw new Error('Invalid verification code');
 
@@ -81,6 +89,7 @@ async function disableMfa(role, id, code, req) {
   const account = await getAccountForRole(role, id);
   if (!account?.mfaEnabled) throw new Error('MFA is not enabled');
 
+  const { verify } = await loadOtp();
   const result = await verify({ token: code, secret: account.mfaSecret });
   if (!result.valid) throw new Error('Invalid verification code');
 
@@ -107,6 +116,7 @@ async function verifyMfaLogin(mfaToken, code, req) {
     throw new Error('MFA is not configured for this account');
   }
 
+  const { verify } = await loadOtp();
   const result = await verify({ token: code, secret: account.mfaSecret });
   if (!result.valid) {
     await logAudit({
